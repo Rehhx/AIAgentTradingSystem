@@ -1,0 +1,25 @@
+# quant agent system — dependencies
+# install with: pip install -r requirements.txt
+
+# core data
+pandas>=2.0.0
+pyarrow>=14.0.0          # parquet read/write
+numpy>=1.26.0
+
+# ML / DL (for ml_research_agent)
+scikit-learn>=1.4.0
+xgboost>=2.0.0
+# torch>=2.2.0            # uncomment for LSTM / Transformer models
+
+# backtesting
+# vectorbt>=0.26.0        # uncomment for vectorized backtesting
+
+# alpaca (paper trading execution)
+alpaca-py>=0.20.0
+
+# claude agent sdk (research + autonomous + code agents)
+claude-agent-sdk>=0.1.0
+
+# utilities
+python-dotenv>=1.0.0     # for .env API key management
+tqdm>=4.66.0             # progress bars for data loading

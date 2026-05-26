@@ -1,0 +1,35 @@
+{
+  "success": true,
+  "strategy": "bb_squeeze",
+  "ticker": "NVDA",
+  "best_threshold": 0.58,
+  "train_sharpe": 0.007,
+  "train_trades": 80,
+  "test_sharpe": -0.9149,
+  "test_trades": 28,
+  "test_wr": 0.4643,
+  "test_dd": -0.00765,
+  "overfit_gap": 0.9219,
+  "all_train_results": [
+    {
+      "threshold": 0.58,
+      "train_sharpe": 0.007,
+      "train_trades": 80
+    },
+    {
+      "threshold": 0.55,
+      "train_sharpe": -0.3992,
+      "train_trades": 99
+    },
+    {
+      "threshold": 0.52,
+      "train_sharpe": -1.0712,
+      "train_trades": 116
+    },
+    {
+      "threshold": 0.5,
+      "train_sharpe": -1.0939,
+      "train_trades": 157
+    }
+  ]
+}
