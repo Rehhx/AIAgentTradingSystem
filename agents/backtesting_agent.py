@@ -42,7 +42,9 @@ logging.basicConfig(
 # ---------------------------------------------------------------------------
 # constants
 # ---------------------------------------------------------------------------
-COMMISSION  = 0.0005   # 0.05% per trade (realistic for retail)
+COMMISSION  = 0.0001   # 0.01% per trade — Alpaca is commission-free; this
+                       # captures FINRA TAF + SEC fees + residual market impact
+                       # at retail size. round-trip with slippage = ~6 bps total.
 SLIPPAGE    = 0.0002   # 0.02% slippage per fill
 INITIAL_CAP = 100_000  # $100k starting capital (matches alpaca paper account)
 
@@ -132,18 +134,112 @@ def regime_label_series(df: pd.DataFrame, window: int = REGIME_WINDOW_BARS) -> p
     return labels
 
 
+# ---------------------------------------------------------------------------
+# market-wide regime classifier (bull / bear / high_vol / neutral)
+# ---------------------------------------------------------------------------
+# this is a coarser-grained classifier than regime_label_series above.
+# regime_label_series tells us what the *intraday window* looks like for a
+# given ticker; compute_market_regime_series tells us what the *broad market
+# environment* is on a given calendar day. strategies can opt into either or
+# both via STRATEGY_REGIME_AFFINITY (intraday) and STRATEGY_MARKET_AFFINITY
+# (market-wide).
+
+def compute_market_regime_series(
+    spy_df: pd.DataFrame,
+    trend_lookback_days: int  = 50,
+    vol_lookback_days:   int  = 20,
+    bull_trend_threshold: float = 0.05,
+    bear_trend_threshold: float = -0.05,
+    high_vol_threshold:   float = 0.25,
+) -> pd.Series:
+    """
+    classify each trading day as bull / bear / high_vol / neutral using SPY:
+      - bull       : 50-day return > +5% AND realized vol <= 25%
+      - bear       : 50-day return < -5% AND realized vol <= 25%
+      - high_vol   : 20-day realized vol > 25%
+      - neutral    : everything else
+
+    high_vol overrides direction — chaotic markets don't behave like trends.
+    returns a daily Series of strings indexed by calendar date.
+    """
+    daily = spy_df["close"].resample("1D").last().dropna()
+    if len(daily) < trend_lookback_days + 1:
+        return pd.Series("neutral", index=daily.index, dtype=object)
+
+    daily_returns = daily.pct_change()
+    trend         = (daily - daily.shift(trend_lookback_days)) / daily.shift(trend_lookback_days)
+    realized_vol  = daily_returns.rolling(vol_lookback_days).std() * np.sqrt(252)
+
+    regime = pd.Series("neutral", index=daily.index, dtype=object)
+    bull_mask = (trend >  bull_trend_threshold) & (realized_vol <= high_vol_threshold)
+    bear_mask = (trend <  bear_trend_threshold) & (realized_vol <= high_vol_threshold)
+    vol_mask  = realized_vol > high_vol_threshold
+    regime[bull_mask] = "bull"
+    regime[bear_mask] = "bear"
+    regime[vol_mask]  = "high_vol"   # vol overrides direction
+    return regime
+
+
+def market_regime_for_df(spy_df: pd.DataFrame, target_df: pd.DataFrame,
+                         **classifier_kwargs) -> pd.Series:
+    """
+    classify the market on the *days* spanned by spy_df, then forward-fill the
+    label onto every 1m bar of target_df. result is a Series aligned to
+    target_df.index ready for run_backtest's market_regime_series parameter.
+    """
+    daily_regime = compute_market_regime_series(spy_df, **classifier_kwargs)
+    return daily_regime.reindex(target_df.index, method="ffill").fillna("neutral")
+
+
+# which market-wide regimes each strategy is allowed to fire in. opt-in:
+# strategies not listed here have no market-regime filter applied.
+STRATEGY_MARKET_AFFINITY = {
+    # squeeze breakouts work best in trending markets; high vol noise tends to
+    # produce false breakouts that whipsaw
+    "bb_squeeze":             {"bull", "bear", "neutral"},
+    # gap fades depend on retail panic — bigger gaps and bigger fades in vol
+    "overnight_gap_fade":     {"bull", "bear", "neutral", "high_vol"},
+    # extreme bar fades capture liquidity vacuums — these happen in any regime
+    "extreme_bar_fade":       {"bull", "bear", "neutral", "high_vol"},
+    # momentum strategies are pure trend plays — needs direction
+    "momentum":               {"bull", "bear"},
+    "ema_crossover":          {"bull", "bear"},
+    # bollinger band touch reversion needs chop or normal vol — fails in trends
+    "bb_band_touch_revert":   {"neutral", "high_vol"},
+    "bb_band_touch_revert_v2":{"neutral", "high_vol"},
+    # ORB and VWAP slope work when there's directional flow
+    "orb":                    {"bull", "bear", "high_vol"},
+    "vwap_slope_break":       {"bull", "bear", "high_vol"},
+    # intraday seasonality should work in any regime if mechanism is real
+    "half_hour_continuation": {"bull", "bear", "neutral", "high_vol"},
+    # zarattini noise-area breakout — paper tests on SPY in all market modes
+    "noise_area_breakout":    {"bull", "bear", "neutral", "high_vol"},
+    # custom trend-ride is designed specifically for directional regimes
+    "trend_ride":             {"bull", "bear"},
+}
+
+
 # which regimes each strategy is allowed to fire in. derived from the
 # strategy's structural assumption (trend-following vs mean-reverting).
 # RSI/VWAP narrowed to "chop" only — the "mean_reversion" bucket is the
 # heuristic's fallback class and still contains too much directional drift
 # for a snapback trade to work reliably.
 STRATEGY_REGIME_AFFINITY = {
-    "rsi_reversion":  {"chop"},
-    "vwap_reversion": {"chop"},
-    "orb":            {"breakout", "trending"},
-    "momentum":       {"trending", "breakout"},
-    "bb_squeeze":     {"breakout"},
-    "ema_crossover":  {"trending"},
+    "rsi_reversion":     {"chop"},
+    "vwap_reversion":    {"chop"},
+    "orb":               {"breakout", "trending"},
+    "momentum":          {"trending", "breakout"},
+    "bb_squeeze":        {"breakout"},
+    "ema_crossover":     {"trending"},
+    "overnight_gap_fade":{"mean_reversion", "chop"},
+    "extreme_bar_fade":  {"mean_reversion", "chop", "breakout"},
+    "vwap_slope_break":  {"trending", "breakout"},
+    "bb_band_touch_revert": {"chop", "mean_reversion"},
+    "bb_band_touch_revert_v2": {"chop", "mean_reversion"},
+    # half-hour continuation operates on intraday seasonality across all regimes
+    "half_hour_continuation": {"trending", "chop", "mean_reversion", "breakout"},
+    "noise_area_breakout":   {"breakout", "trending", "mean_reversion"},
+    "trend_ride":            {"trending", "breakout"},
 }
 
 
@@ -369,6 +465,478 @@ def signals_bb_squeeze(df: pd.DataFrame, params: dict) -> pd.Series:
     return signal
 
 
+def signals_vwap_slope_break(df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    high-frequency intraday strategy: trade in the direction of the VWAP slope
+    when it crosses zero. enters when VWAP slope flips positive (long) or
+    negative (short); exits when slope flips back. fires often — most days
+    produce multiple entries.
+
+    structural mechanism: intraday VWAP is the reference price for institutional
+    execution. when VWAP slope changes sign, large orders are being filled
+    against the recent direction. trading with the new slope captures the
+    continuation while those orders complete.
+    """
+    slope_lookback = params.get("slope_lookback_bars", 10)
+    min_atr_pct    = params.get("min_atr_pct", 0.0005)
+
+    v   = vwap(df)
+    a   = atr(df, 14) / df["close"]   # normalized volatility filter
+    sl  = v.diff(slope_lookback)
+    sl_sign = np.sign(sl)
+    sl_prev = sl_sign.shift(1)
+
+    signal = pd.Series(0, index=df.index, dtype=int)
+    pos = 0
+    for i in range(slope_lookback, len(df)):
+        s_now  = sl_sign.iloc[i]
+        s_prev = sl_prev.iloc[i]
+        atr_ok = bool(a.iloc[i] >= min_atr_pct) if not pd.isna(a.iloc[i]) else False
+        if pos == 0:
+            if s_now > 0 and s_prev <= 0 and atr_ok:
+                pos = 1
+            elif s_now < 0 and s_prev >= 0 and atr_ok:
+                pos = -1
+        elif pos == 1 and s_now < 0:
+            pos = 0
+        elif pos == -1 and s_now > 0:
+            pos = 0
+        signal.iloc[i] = pos
+    return signal
+
+
+def signals_bb_band_touch_revert(df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    high-frequency mean reversion: fade touches of the upper/lower bollinger
+    band. enters short on upper touch, long on lower touch, exits at the mid
+    band. fires daily, often multiple times.
+
+    structural mechanism: at 2-sigma band touch on 1m, price has overextended
+    relative to its recent distribution. without a fundamental driver, the
+    median outcome is reversion toward the rolling mean.
+    """
+    period = params.get("bb_period", 20)
+    std    = params.get("bb_std", 2.0)
+    min_atr_pct = params.get("min_atr_pct", 0.0003)
+
+    lower, mid, upper = bollinger_bands(df["close"], period, std)
+    a = atr(df, 14) / df["close"]
+
+    signal = pd.Series(0, index=df.index, dtype=int)
+    pos = 0
+    for i in range(period, len(df)):
+        c   = df["close"].iloc[i]
+        lo  = lower.iloc[i]
+        hi  = upper.iloc[i]
+        mi  = mid.iloc[i]
+        atr_ok = bool(a.iloc[i] >= min_atr_pct) if not pd.isna(a.iloc[i]) else False
+        if pd.isna(lo) or pd.isna(hi) or pd.isna(mi):
+            continue
+        if pos == 0 and atr_ok:
+            if c <= lo:
+                pos = 1
+            elif c >= hi:
+                pos = -1
+        elif pos == 1 and c >= mi:
+            pos = 0
+        elif pos == -1 and c <= mi:
+            pos = 0
+        signal.iloc[i] = pos
+    return signal
+
+
+def signals_bb_band_touch_revert_v2(df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    v2 of bb_band_touch_revert with RSI confluence and stricter entry:
+      - require RSI <= rsi_oversold (default 30) AND close <= lower band for long
+      - require RSI >= rsi_overbought (default 70) AND close >= upper band for short
+      - require close *outside* the band by min_breach_pct (not just touch)
+
+    v1 had 49% win rate but Sharpe -11.68 — losses were larger than wins because
+    band-touches alone catch too many noise dips that continue. requiring RSI
+    confirmation filters to genuinely overextended moves where mean-reversion is
+    more likely; the stricter entry trades volume for hit-rate quality.
+    """
+    period          = params.get("bb_period", 20)
+    std             = params.get("bb_std", 2.0)
+    rsi_period      = params.get("rsi_period", 14)
+    rsi_overbought  = params.get("rsi_overbought", 70)
+    rsi_oversold    = params.get("rsi_oversold", 30)
+    min_breach_pct  = params.get("min_breach_pct", 0.0005)
+    min_atr_pct     = params.get("min_atr_pct", 0.0003)
+
+    lower, mid, upper = bollinger_bands(df["close"], period, std)
+    a = atr(df, 14) / df["close"]
+    r = rsi(df["close"], rsi_period)
+
+    signal = pd.Series(0, index=df.index, dtype=int)
+    pos = 0
+    for i in range(period, len(df)):
+        c   = df["close"].iloc[i]
+        lo  = lower.iloc[i]
+        hi  = upper.iloc[i]
+        mi  = mid.iloc[i]
+        ri  = r.iloc[i]
+        atr_ok = bool(a.iloc[i] >= min_atr_pct) if not pd.isna(a.iloc[i]) else False
+        if pd.isna(lo) or pd.isna(hi) or pd.isna(mi) or pd.isna(ri):
+            continue
+        if pos == 0 and atr_ok:
+            below_band = c <= lo * (1.0 - min_breach_pct)
+            above_band = c >= hi * (1.0 + min_breach_pct)
+            if below_band and ri <= rsi_oversold:
+                pos = 1
+            elif above_band and ri >= rsi_overbought:
+                pos = -1
+        elif pos == 1 and c >= mi:
+            pos = 0
+        elif pos == -1 and c <= mi:
+            pos = 0
+        signal.iloc[i] = pos
+    return signal
+
+
+def signals_half_hour_continuation(df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    intraday periodicity: trade the sign of each 30-min bucket's prior-N-day
+    average return. e.g. if 10:00-10:30 has averaged +5 bps over the past 40
+    days, take a long during 10:00-10:30 today.
+
+    structural mechanism: Heston, Korajczyk & Sadka (JF 2010) — institutional
+    order-splitting on fixed schedules (TWAP slicers, fund-flow rebalances,
+    options-hedging cadences) repeats at the same intraday clock-time, producing
+    return persistence in each half-hour bucket up to ~40 trading days out.
+
+    single-ticker time-series variant of the paper's cross-sectional design.
+    """
+    lookback_days  = params.get("lookback_days", 40)
+    bucket_min     = params.get("bucket_size_min", 30)
+    threshold_bps  = params.get("threshold_bps", 3)
+    threshold      = threshold_bps / 10000.0
+
+    # build 30-min bars from the 1-min source
+    bars = df.resample(f"{bucket_min}min", label="left", closed="left").agg(
+        open=("open", "first"),
+        close=("close", "last"),
+    ).dropna()
+    if bars.empty:
+        return pd.Series(0, index=df.index, dtype=int)
+
+    # keep only buckets that begin during regular trading hours
+    et_idx = bars.index.tz_convert("America/New_York")
+    in_session = (
+        (et_idx.time >= pd.Timestamp("2000-01-01 09:30").time()) &
+        (et_idx.time <  pd.Timestamp("2000-01-01 16:00").time())
+    )
+    bars = bars[in_session]
+    if bars.empty:
+        return pd.Series(0, index=df.index, dtype=int)
+
+    bars["ret"]    = bars["close"] / bars["open"] - 1.0
+    et_idx         = bars.index.tz_convert("America/New_York")
+    bars["bucket"] = (et_idx.hour * 60 + et_idx.minute).astype(int)
+
+    # per-bucket trailing avg of the prior N occurrences (one occurrence = one day)
+    bars["avg_ret"] = (
+        bars.groupby("bucket")["ret"]
+            .transform(lambda x: x.shift(1).rolling(lookback_days, min_periods=max(10, lookback_days // 4)).mean())
+    )
+
+    sig_30m = pd.Series(0, index=bars.index, dtype=int)
+    sig_30m[bars["avg_ret"] >  threshold] =  1
+    sig_30m[bars["avg_ret"] < -threshold] = -1
+
+    # project the 30-min signal onto every 1-min bar via forward-fill
+    sig_1m = sig_30m.reindex(df.index, method="ffill").fillna(0).astype(int)
+
+    # force flat at the last 1-min bar of each trading day so we never carry
+    # overnight (the resample step doesn't reset on session breaks)
+    et_idx_1m = df.index.tz_convert("America/New_York")
+    date_1m   = pd.Series(et_idx_1m.normalize(), index=df.index)
+    is_eod    = date_1m != date_1m.shift(-1)
+    sig_1m[is_eod] = 0
+    return sig_1m
+
+
+def signals_noise_area_breakout(df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    intraday noise area breakout — Zarattini, Aziz & Barbon (2024).
+    SSRN 4824172. claimed SPY Sharpe ~1.33.
+
+    mechanism:
+      - each trading day, the "noise area" is the range we expect the
+        underlying to move purely from microstructure noise.
+      - measured as a multiple sigma_mult of the average absolute move-from-
+        open across the prior `lookback_days` sessions.
+      - when intraday close pierces the upper (lower) bound, take it as a
+        sign of NON-noise directional flow and go long (short).
+      - exit on VWAP cross against position OR end of session.
+
+    paper's structural justification: institutional order flow that exceeds
+    the typical noise envelope reflects new information. exiting at VWAP
+    cross protects against early-day false breaks that retrace.
+    """
+    sigma_mult       = params.get("sigma_mult", 1.0)
+    lookback_days    = params.get("lookback_days", 14)
+    one_entry_per_day = bool(params.get("one_entry_per_day", True))
+
+    # 1. daily open + average absolute move-from-open over prior N sessions.
+    # use the calendar-date STRING as the bucket key — avoids tz-aware/naive
+    # reindex bugs where DatetimeIndex with ET tz fails to match values from
+    # date_series.values (which strips the tz).
+    et_idx       = df.index.tz_convert("America/New_York")
+    date_keys    = pd.Series(et_idx.strftime("%Y-%m-%d"), index=df.index)
+
+    daily_open    = df["open"].groupby(date_keys).first()
+    daily_high    = df["high"].groupby(date_keys).max()
+    daily_low     = df["low"].groupby(date_keys).min()
+    daily_range   = (daily_high - daily_low) / daily_open
+    avg_move      = daily_range.rolling(lookback_days).mean().shift(1)
+
+    upper_per_day = (daily_open * (1 + sigma_mult * avg_move)).to_dict()
+    lower_per_day = (daily_open * (1 - sigma_mult * avg_move)).to_dict()
+
+    # 2. intraday VWAP (resets each session)
+    v = vwap(df)
+
+    # 3. walk bar-by-bar — dict lookup keyed by date string
+    signal = pd.Series(0, index=df.index, dtype=int)
+    pos    = 0
+    traded_long_today  = False
+    traded_short_today = False
+    prev_date          = None
+
+    dates_arr = date_keys.values
+    close_arr = df["close"].values
+    vwap_arr  = v.values
+
+    last_idx = len(df) - 1
+    for i in range(len(df)):
+        d  = dates_arr[i]
+        if d != prev_date:
+            # session boundary
+            traded_long_today  = False
+            traded_short_today = False
+            prev_date = d
+            # close any overnight position (we never carry across days)
+            pos = 0
+
+        c   = close_arr[i]
+        up  = upper_per_day.get(d)
+        lo  = lower_per_day.get(d)
+        vw  = vwap_arr[i]
+        if up is None or lo is None or pd.isna(up) or pd.isna(lo) or pd.isna(vw):
+            signal.iloc[i] = pos
+            continue
+
+        # entry
+        if pos == 0:
+            if c > up and (not traded_long_today or not one_entry_per_day):
+                pos = 1
+                traded_long_today = True
+            elif c < lo and (not traded_short_today or not one_entry_per_day):
+                pos = -1
+                traded_short_today = True
+
+        # exit on VWAP cross against position
+        elif pos == 1 and c < vw:
+            pos = 0
+        elif pos == -1 and c > vw:
+            pos = 0
+
+        # force flat at last bar of the day (next iter's date check would do it
+        # too, but this records the flat in the signal for cleanliness)
+        next_idx = i + 1
+        if next_idx > last_idx or dates_arr[next_idx] != d:
+            pos = 0
+
+        signal.iloc[i] = pos
+    return signal
+
+
+def signals_trend_ride(df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    custom strategy designed from prior backtest findings:
+
+      - bb_squeeze had episodic positive Sharpe — momentum breakout has SOMETIMES
+        edge, often in trending regimes
+      - mean-reversion strategies had high WR but bad payoff
+      - market regime classifier shows ~37% of days are bull/bear (real trend)
+
+    design: slow, picky trend-follower with wide stops + long max-hold.
+
+      entry  : close > 50-bar EMA AND close > 30-bar high AND vol_z > 1
+               (mirror: close < 50-bar EMA AND close < 30-bar low AND vol_z > 1)
+      exit   : close crosses back through the 50-bar EMA
+      filter : intended to pair with apply_market_regime=True so only fires
+               in bull or bear regimes (handled at run_backtest level via
+               STRATEGY_MARKET_AFFINITY['trend_ride'] = {'bull','bear'})
+
+    the goal is "hold a lot to make profit": few trades, wide stops, long hold.
+    """
+    ema_period        = params.get("ema_period", 50)
+    breakout_lookback = params.get("breakout_lookback", 30)
+    vol_z_min         = params.get("vol_z_min", 1.0)
+
+    e         = ema(df["close"], ema_period)
+    roll_high = df["close"].rolling(breakout_lookback).max().shift(1)
+    roll_low  = df["close"].rolling(breakout_lookback).min().shift(1)
+    vol_z     = volume_zscore(df["volume"])
+
+    signal = pd.Series(0, index=df.index, dtype=int)
+    pos = 0
+    for i in range(ema_period + 1, len(df)):
+        c  = df["close"].iloc[i]
+        em = e.iloc[i]
+        vh = roll_high.iloc[i]
+        vl = roll_low.iloc[i]
+        vz = vol_z.iloc[i]
+
+        if pd.isna(em) or pd.isna(vh) or pd.isna(vl) or pd.isna(vz):
+            continue
+
+        if pos == 0:
+            if c > em and c > vh and vz > vol_z_min:
+                pos = 1
+            elif c < em and c < vl and vz > vol_z_min:
+                pos = -1
+        elif pos == 1 and c < em:
+            pos = 0
+        elif pos == -1 and c > em:
+            pos = 0
+
+        signal.iloc[i] = pos
+    return signal
+
+
+def signals_overnight_gap_fade(df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    fade large overnight gaps: long after a sharp gap-down open, short after a
+    sharp gap-up open. exits at exit_time_et (default 12:00 ET) — the fade is
+    a morning-only effect once VWAP funds finish their forced execution.
+
+    structural mechanism: retail panic on overnight news compounds with
+    market-on-open fills; the residual pressure exhausts in the first 1-2
+    hours and price drifts back toward prior-day close.
+    """
+    gap_threshold = params.get("gap_threshold_pct", 0.010)
+    exit_time_et  = params.get("exit_time_et", "12:00")
+
+    et_idx = df.index.tz_convert("America/New_York")
+    dates  = pd.Series(et_idx.normalize(), index=df.index)
+
+    daily_open  = df["open"].groupby(dates).first()
+    daily_close = df["close"].groupby(dates).last()
+    daily_gap   = (daily_open - daily_close.shift(1)) / daily_close.shift(1)
+
+    direction_per_day = pd.Series(0, index=daily_gap.index, dtype=int)
+    direction_per_day[daily_gap >  gap_threshold] = -1   # fade gap-up
+    direction_per_day[daily_gap < -gap_threshold] =  1   # fade gap-down
+
+    bar_direction = direction_per_day.reindex(dates).values
+
+    exit_h, exit_m = [int(x) for x in exit_time_et.split(":")]
+    after_exit = (et_idx.hour > exit_h) | ((et_idx.hour == exit_h) & (et_idx.minute >= exit_m))
+
+    signal = pd.Series(bar_direction, index=df.index)
+    signal[after_exit] = 0
+    return signal.astype(int)
+
+
+def signals_extreme_bar_fade(df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    fade single-bar moves whose body exceeds threshold * ATR: long the bar
+    after a big down-bar, short the bar after a big up-bar. holds for
+    hold_bars then exits.
+
+    structural mechanism: 1-bar spikes are usually liquidity vacuums (one
+    aggressive order, no offsetting flow). once the next minute's resting
+    orders refresh, price tends to revert at least partially.
+    """
+    atr_period = params.get("atr_period", 14)
+    threshold  = params.get("body_atr_mult", 3.0)
+    hold_bars  = params.get("hold_bars", 10)
+
+    body    = (df["close"] - df["open"]).abs()
+    atr_v   = atr(df, atr_period)
+    extreme = body > (threshold * atr_v)
+    bar_dir = np.sign(df["close"] - df["open"])   # +1 up bar, -1 down bar
+
+    signal = pd.Series(0, index=df.index, dtype=int)
+    pos = 0
+    held = 0
+    for i in range(atr_period, len(df)):
+        if pos != 0:
+            held += 1
+            if held >= hold_bars:
+                pos = 0
+                held = 0
+        if pos == 0 and bool(extreme.iloc[i]):
+            d = int(-bar_dir.iloc[i])
+            if d != 0:
+                pos  = d
+                held = 0
+        signal.iloc[i] = pos
+    return signal
+
+
+def signals_qqq_spy_dispersion_multi(dfs: dict, params: dict) -> pd.Series:
+    """multi-asset adapter wrapping signals_qqq_spy_dispersion for the engine."""
+    return signals_qqq_spy_dispersion(dfs["QQQ"], dfs["SPY"], params)
+
+
+def signals_qqq_spy_dispersion(qqq_df: pd.DataFrame, spy_df: pd.DataFrame, params: dict) -> pd.Series:
+    """
+    cross-asset: short-horizon dislocations between QQQ and SPY beyond their
+    typical beta-adjusted co-movement should mean-revert. trades QQQ.
+
+      - rolling beta of QQQ-vs-SPY log returns (beta_lookback_min)
+      - residual = qqq_ret - beta * spy_ret
+      - z-score of residual (zscore_lookback_min)
+      - enter SHORT QQQ when z > entry_z (QQQ outperformed, expect snapback)
+      - enter LONG  QQQ when z < -entry_z
+      - exit when |z| <= exit_z
+
+    returns signal series aligned to qqq_df.index (single-ticker shape so the
+    standard run_backtest can consume it without changes).
+    """
+    beta_lb = params.get("beta_lookback_min", 60)
+    z_lb    = params.get("zscore_lookback_min", 30)
+    entry_z = params.get("entry_z", 2.0)
+    exit_z  = params.get("exit_z", 0.3)
+
+    common = qqq_df.index.intersection(spy_df.index)
+    q = qqq_df["close"].reindex(common)
+    s = spy_df["close"].reindex(common)
+
+    q_ret = np.log(q / q.shift(1))
+    s_ret = np.log(s / s.shift(1))
+
+    cov  = q_ret.rolling(beta_lb).cov(s_ret)
+    var  = s_ret.rolling(beta_lb).var().replace(0, np.nan)
+    beta = cov / var
+    resid = q_ret - beta * s_ret
+    z = (resid - resid.rolling(z_lb).mean()) / resid.rolling(z_lb).std().replace(0, np.nan)
+
+    sig = pd.Series(0, index=common)
+    pos = 0
+    for i in range(len(common)):
+        zi = z.iloc[i]
+        if pd.isna(zi):
+            continue
+        if pos == 0:
+            if zi > entry_z:
+                pos = -1
+            elif zi < -entry_z:
+                pos = 1
+        elif pos == 1 and zi >= -exit_z:
+            pos = 0
+        elif pos == -1 and zi <= exit_z:
+            pos = 0
+        sig.iloc[i] = pos
+
+    return sig.reindex(qqq_df.index, fill_value=0)
+
+
 def signals_ema_crossover(df: pd.DataFrame, params: dict) -> pd.Series:
     """
     fast EMA crosses above slow EMA = long
@@ -397,6 +965,9 @@ def signals_ema_crossover(df: pd.DataFrame, params: dict) -> pd.Series:
 # stop_atr_mult is read by run_backtest: tight for trend, wide for mean-reversion.
 # "active" is consumed by the standalone runner; orchestrator can still dispatch
 # an inactive strategy explicitly by name (useful for revisiting after signal work).
+#
+# the registry is mutable at runtime — code_agent registers freshly-generated
+# strategies via register_strategy() so the next backtest can find them.
 STRATEGIES = {
     "rsi_reversion":  (signals_rsi_reversion,  {"rsi_period": 14, "oversold": 30, "overbought": 70, "stop_atr_mult": 3.5, "active": False}),
     "vwap_reversion": (signals_vwap_reversion,  {"threshold_pct": 0.003, "stop_atr_mult": 3.5,                         "active": False}),
@@ -404,7 +975,190 @@ STRATEGIES = {
     "momentum":       (signals_momentum,        {"lookback_bars": 20, "volume_zscore_min": 1.0, "stop_atr_mult": 1.5,  "active": True}),
     "bb_squeeze":     (signals_bb_squeeze,      {"bb_period": 20, "bb_std": 2.0, "kc_mult": 1.5, "stop_atr_mult": 2.0, "active": True}),
     "ema_crossover":  (signals_ema_crossover,   {"fast_period": 9, "slow_period": 21, "stop_atr_mult": 1.5,            "active": True}),
+
+    # high-frequency intraday strategies — fire many times per day
+    "vwap_slope_break": (
+        signals_vwap_slope_break,
+        {"slope_lookback_bars": 10, "min_atr_pct": 0.0005,
+         "stop_atr_mult": 1.5, "max_hold_bars": 30, "active": True},
+    ),
+    "bb_band_touch_revert": (
+        signals_bb_band_touch_revert,
+        {"bb_period": 20, "bb_std": 2.0, "min_atr_pct": 0.0003,
+         "stop_atr_mult": 2.5, "max_hold_bars": 30, "active": True},
+    ),
+    # v2: stricter entry (RSI confluence + breach beyond band) and tighter stop.
+    # v1 had 49% WR but Sharpe -11.68 — payoff asymmetry, fixed here by being
+    # pickier about entries rather than letting any band touch fire.
+    "bb_band_touch_revert_v2": (
+        signals_bb_band_touch_revert_v2,
+        {"bb_period": 20, "bb_std": 2.0, "rsi_period": 14,
+         "rsi_overbought": 70, "rsi_oversold": 30,
+         "min_breach_pct": 0.0005, "min_atr_pct": 0.0003,
+         "stop_atr_mult": 1.5, "max_hold_bars": 30, "active": True},
+    ),
+    # intraday periodicity per Heston/Korajczyk/Sadka 2010 — single-ticker
+    # time-series variant. half-hour bucket return sign over prior N days.
+    "half_hour_continuation": (
+        signals_half_hour_continuation,
+        {"lookback_days": 40, "bucket_size_min": 30, "threshold_bps": 3,
+         "stop_atr_mult": 2.0, "max_hold_bars": 30, "active": True},
+    ),
+
+    # Zarattini, Aziz & Barbon 2024 — intraday noise-area breakout.
+    # SSRN 4824172. paper claims SPY Sharpe ~1.33 with sigma_mult=1.0.
+    "noise_area_breakout": (
+        signals_noise_area_breakout,
+        {"sigma_mult": 1.0, "lookback_days": 14, "one_entry_per_day": True,
+         "stop_atr_mult": 2.0, "max_hold_bars": 390, "active": True},
+    ),
+
+    # custom: slow trend-ride. wide stops, long hold, regime-gated.
+    "trend_ride": (
+        signals_trend_ride,
+        {"ema_period": 50, "breakout_lookback": 30, "vol_z_min": 1.0,
+         "stop_atr_mult": 2.5, "max_hold_bars": 200, "active": True},
+    ),
+
+    # structural-edge strategies — fading liquidity dislocations
+    "overnight_gap_fade": (
+        signals_overnight_gap_fade,
+        {"gap_threshold_pct": 0.010, "exit_time_et": "12:00",
+         "stop_atr_mult": 2.5, "max_hold_bars": 180, "active": True},
+    ),
+    "extreme_bar_fade": (
+        signals_extreme_bar_fade,
+        {"atr_period": 14, "body_atr_mult": 3.0, "hold_bars": 10,
+         "stop_atr_mult": 2.0, "active": True},
+    ),
+
+    # cross-asset (3-tuple) — engine dispatches via meta["kind"] == "multi"
+    # ATR stop disabled, 20-bar time exit per autonomous_agent's original spec —
+    # the residual needs room to mean-revert; ATR stop was killing it inside noise.
+    "qqq_spy_dispersion": (
+        signals_qqq_spy_dispersion_multi,
+        {"beta_lookback_min": 60, "zscore_lookback_min": 30,
+         "entry_z": 2.0, "exit_z": 0.3,
+         "disable_atr_stop": True, "max_hold_bars": 20, "active": True},
+        {"kind": "multi", "data_tickers": ["QQQ", "SPY"], "tradeable_ticker": "QQQ"},
+    ),
 }
+
+
+# ---------------------------------------------------------------------------
+# runtime registration — code_agent uses these to add generated strategies
+# ---------------------------------------------------------------------------
+
+def is_registered(name: str) -> bool:
+    """true if the strategy name has a signal function in STRATEGIES."""
+    if not name:
+        return False
+    norm = name.lower().replace(" ", "_")
+    return any(key in norm or norm in key for key in STRATEGIES)
+
+
+def get_strategy_meta(strategy_key: str) -> dict:
+    """returns the 3rd-tuple meta dict for a strategy; defaults to single-asset."""
+    entry = STRATEGIES.get(strategy_key)
+    if not entry:
+        return {"kind": "single"}
+    if len(entry) >= 3 and isinstance(entry[2], dict):
+        meta = dict(entry[2])
+        meta.setdefault("kind", "single")
+        return meta
+    return {"kind": "single"}
+
+
+def load_generated_strategies(strategies_dir: Path = Path("strategies")) -> int:
+    """
+    scan strategies/ for modules with a signals() function and register each
+    one into STRATEGIES. called on orchestrator startup so generated code
+    survives process restarts. returns the count registered.
+
+    file naming convention: <strategy_id>_<strategy_name>.py — name is the
+    portion after the first underscore.
+    """
+    if not strategies_dir.exists():
+        return 0
+
+    import importlib.util
+    loaded = 0
+    for path in sorted(strategies_dir.glob("*.py")):
+        if path.name.startswith("_") or path.stem == "__init__":
+            continue
+        # name = filename minus the strategy_id prefix
+        parts = path.stem.split("_", 1)
+        strategy_name = parts[1] if len(parts) == 2 else path.stem
+
+        if is_registered(strategy_name):
+            continue  # already registered (either built-in or previously loaded)
+
+        try:
+            spec = importlib.util.spec_from_file_location(f"gen_{path.stem}", path)
+            mod  = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+        except Exception as e:
+            log.warning(f"failed to import {path.name}: {e}")
+            continue
+
+        if not hasattr(mod, "signals"):
+            log.warning(f"{path.name}: no signals() function — skipping")
+            continue
+
+        try:
+            register_strategy(strategy_name, mod.signals, default_params={}, overwrite=False)
+            loaded += 1
+        except Exception as e:
+            log.warning(f"register_strategy failed for {strategy_name}: {e}")
+
+    if loaded:
+        log.info(f"loaded {loaded} generated strategies from {strategies_dir}/")
+    return loaded
+
+
+def register_strategy(name: str, signal_fn, default_params: dict,
+                      regime_affinity: Optional[set] = None,
+                      stop_atr_mult: float = 2.0,
+                      overwrite: bool = False,
+                      meta: Optional[dict] = None) -> str:
+    """
+    add a strategy to the runtime registry.
+
+    single-asset signal: signal_fn(df, params) -> Series of {-1,0,1} on df.index
+                         meta=None (default).
+    cross-asset signal:  signal_fn(dfs_dict, params) -> Series on
+                         dfs_dict[meta["tradeable_ticker"]].index
+                         meta={"kind": "multi", "data_tickers": [...],
+                               "tradeable_ticker": "..."}.
+
+    returns the normalized key used in STRATEGIES.
+    """
+    if signal_fn is None:
+        raise ValueError("signal_fn required")
+
+    key    = name.lower().replace(" ", "_")
+    params = {**(default_params or {})}
+    params.setdefault("stop_atr_mult", stop_atr_mult)
+    params.setdefault("active", True)
+
+    if key in STRATEGIES and not overwrite:
+        raise ValueError(f"strategy '{key}' already registered (pass overwrite=True to replace)")
+
+    if meta and meta.get("kind") == "multi":
+        if not meta.get("data_tickers"):
+            raise ValueError("multi-asset strategy requires meta['data_tickers']")
+        if not meta.get("tradeable_ticker"):
+            raise ValueError("multi-asset strategy requires meta['tradeable_ticker']")
+        if meta["tradeable_ticker"] not in meta["data_tickers"]:
+            raise ValueError("tradeable_ticker must be in data_tickers")
+        STRATEGIES[key] = (signal_fn, params, meta)
+    else:
+        STRATEGIES[key] = (signal_fn, params)
+
+    if regime_affinity is not None:
+        STRATEGY_REGIME_AFFINITY[key] = set(regime_affinity)
+    log.info(f"registered strategy '{key}' | meta={meta or 'single-asset'} | affinity={regime_affinity}")
+    return key
 
 
 # ---------------------------------------------------------------------------
@@ -420,6 +1174,10 @@ def run_backtest(
     allowed_regimes: Optional[set] = None,
     quality_series: Optional[pd.DataFrame] = None,
     quality_min_pct_pos: float = 0.55,
+    disable_atr_stop: bool = False,    # opt-out for slow mean-reversion
+    max_hold_bars: Optional[int] = None,  # force exit after N bars (None = no cap)
+    market_regime_series: Optional[pd.Series] = None,    # bar-aligned bull/bear/high_vol/neutral
+    allowed_market_regimes: Optional[set] = None,        # filter entries by market regime
 ) -> dict:
     """
     simulates trades from a signal series on OHLCV data.
@@ -445,6 +1203,7 @@ def run_backtest(
     pos      = 0
     entry_px = 0.0
     entry_ts = None
+    entry_bar = -1
     shares   = 0
     last_exit_bar = -REENTRY_COOLDOWN_BARS   # allow first entry immediately
 
@@ -456,14 +1215,18 @@ def run_backtest(
         sig = int(signal.iloc[i])
         prev_sig = int(signal.iloc[i - 1])
 
-        # ATR stop: override sig to flat if the open position has moved
-        # adversely by >= ATR_STOP_MULT * ATR. Existing exit branch then fires.
-        if pos != 0:
+        # ATR stop (skippable per strategy): override sig to flat if the open
+        # position has moved adversely by >= stop_atr_mult * ATR.
+        if pos != 0 and not disable_atr_stop:
             atr_val = atr_series.iloc[i]
             if not pd.isna(atr_val) and atr_val > 0:
                 adverse = (entry_px - c) * pos   # > 0 when losing
                 if adverse >= stop_atr_mult * atr_val:
                     sig = 0
+
+        # time-based stop: force flat after max_hold_bars regardless of signal
+        if pos != 0 and max_hold_bars is not None and (i - entry_bar) >= max_hold_bars:
+            sig = 0
 
         # entry — only if cooldown elapsed AND regime is compatible AND the
         # embedding-based quality gate (if provided) confirms the direction.
@@ -473,6 +1236,11 @@ def run_backtest(
             or regime_series is None
             or regime_series.iloc[i] in allowed_regimes
         )
+        market_ok = (
+            allowed_market_regimes is None
+            or market_regime_series is None
+            or market_regime_series.iloc[i] in allowed_market_regimes
+        )
         quality_ok = True
         if quality_series is not None and sig != 0 and i < len(quality_series):
             pct_pos = quality_series["fwd_pct_positive"].iloc[i]
@@ -481,11 +1249,12 @@ def run_backtest(
                     quality_ok = pct_pos >= quality_min_pct_pos
                 else:  # sig == -1
                     quality_ok = pct_pos <= (1.0 - quality_min_pct_pos)
-        if pos == 0 and sig != 0 and regime_ok and quality_ok and (i - last_exit_bar) >= REENTRY_COOLDOWN_BARS:
+        if pos == 0 and sig != 0 and regime_ok and market_ok and quality_ok and (i - last_exit_bar) >= REENTRY_COOLDOWN_BARS:
             pos      = sig
             entry_px = c * (1 + SLIPPAGE * sig)   # slip in direction of trade
             shares   = int((capital * position_size_pct) / entry_px)
             entry_ts = ts
+            entry_bar = i
             commission_cost = shares * entry_px * COMMISSION
             capital -= commission_cost
 
@@ -645,7 +1414,7 @@ def walk_forward_optimize(
         return {"success": False, "reason": f"unknown strategy {strategy_name}"}
 
     tickers = tickers or ["SPY", "QQQ", "TSLA", "NVDA", "AAPL"]
-    fn, default_params = STRATEGIES[strategy_name]
+    fn, default_params = STRATEGIES[strategy_name][0], STRATEGIES[strategy_name][1]
     allowed   = STRATEGY_REGIME_AFFINITY.get(strategy_name)
 
     # preload + split each ticker
@@ -707,6 +1476,7 @@ def walk_forward_with_gate(
     end: str = "2025-01-01",
     train_pct: float = 0.7,
     data_dir: Path = DATA_DIR,
+    params_override: Optional[dict] = None,
 ) -> dict:
     """
     walk-forward a single (strategy, ticker) pair with the embedding gate.
@@ -720,9 +1490,10 @@ def walk_forward_with_gate(
 
     quality_min_pct_pos_grid = quality_min_pct_pos_grid or [0.50, 0.52, 0.55, 0.58]
 
-    fn, default_params = STRATEGIES[strategy_name]
-    stop_mult = default_params.get("stop_atr_mult", ATR_STOP_MULT)
-    allowed   = STRATEGY_REGIME_AFFINITY.get(strategy_name)
+    fn, default_params = STRATEGIES[strategy_name][0], STRATEGIES[strategy_name][1]
+    merged_params = {**default_params, **(params_override or {})}
+    stop_mult     = merged_params.get("stop_atr_mult", ATR_STOP_MULT)
+    allowed       = STRATEGY_REGIME_AFFINITY.get(strategy_name)
 
     df = load_ticker(ticker, data_dir=data_dir, start=start, end=end, session="regular")
     cut       = int(len(df) * train_pct)
@@ -734,8 +1505,8 @@ def walk_forward_with_gate(
     quality_tr  = quality_all.iloc[:cut]
     quality_te  = quality_all.iloc[cut:]
 
-    train_signal = fn(train_df, default_params)
-    test_signal  = fn(test_df,  default_params)
+    train_signal = fn(train_df, merged_params)
+    test_signal  = fn(test_df,  merged_params)
     train_regime = regime_label_series(train_df)
     test_regime  = regime_label_series(test_df)
 
@@ -767,6 +1538,7 @@ def walk_forward_with_gate(
         "success":         True,
         "strategy":        strategy_name,
         "ticker":          ticker,
+        "params_used":     merged_params,
         "best_threshold":  best["threshold"],
         "train_sharpe":    best["train_sharpe"],
         "train_trades":    best["train_trades"],
@@ -846,6 +1618,85 @@ def precompute_regime_quality(
 
 
 # ---------------------------------------------------------------------------
+# trade-log export — write every fill out to a CSV the user can audit
+# ---------------------------------------------------------------------------
+
+def dump_trades_to_csv(
+    trades: list,
+    strategy_key: str,
+    ticker: str,
+    regime_series: Optional[pd.Series] = None,
+    out_dir: Path = Path("results/trades"),
+) -> Optional[Path]:
+    """
+    write the trades list returned by run_backtest to a CSV file. each row is
+    a single round-trip (entry+exit) so the user can confirm the simulator's
+    PnL by hand.
+
+    columns include:
+      entry_date / entry_time / exit_date / exit_time — easy human read
+      side, shares, entry_px, exit_px
+      gross_cost     — shares * entry_px (what you committed)
+      gross_proceeds — shares * exit_px  (what you received at exit)
+      pnl, return_pct, hold_minutes, hold_bars
+      regime_at_entry — if regime_series provided
+
+    these are derived columns: they let you spot anomalies (e.g. negative
+    "gross_proceeds" or zero shares) without joining back to the original
+    trades list.
+    """
+    if not trades:
+        return None
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{strategy_key}_{ticker}_trades.csv"
+
+    df = pd.DataFrame(trades).copy()
+
+    # ensure timestamps are pandas Timestamps
+    df["entry_ts"] = pd.to_datetime(df["entry_ts"], utc=True)
+    df["exit_ts"]  = pd.to_datetime(df["exit_ts"],  utc=True)
+
+    # ET-localized date/time columns — the format a human auditor reads
+    et = df["entry_ts"].dt.tz_convert("America/New_York")
+    xt = df["exit_ts" ].dt.tz_convert("America/New_York")
+    df["entry_date"] = et.dt.strftime("%Y-%m-%d")
+    df["entry_time"] = et.dt.strftime("%H:%M:%S")
+    df["exit_date"]  = xt.dt.strftime("%Y-%m-%d")
+    df["exit_time"]  = xt.dt.strftime("%H:%M:%S")
+
+    # dollar columns
+    df["gross_cost"]     = (df["shares"] * df["entry_px"]).round(2)
+    df["gross_proceeds"] = (df["shares"] * df["exit_px"]).round(2)
+
+    # hold duration in minutes — easier to scan than bars_held
+    df["hold_minutes"]   = ((df["exit_ts"] - df["entry_ts"]).dt.total_seconds() / 60).round(1)
+    df = df.rename(columns={"bars_held": "hold_bars", "pct_return": "return_pct"})
+
+    if regime_series is not None:
+        def _regime_for(ts):
+            try:
+                return regime_series.loc[ts]
+            except Exception:
+                return "unknown"
+        df["regime_at_entry"] = df["entry_ts"].apply(_regime_for)
+
+    # write columns in a human-friendly order; drop the raw timestamps since
+    # entry_date/time + exit_date/time cover the same info more readably
+    ordered = [
+        "entry_date", "entry_time", "exit_date", "exit_time",
+        "side", "shares", "entry_px", "exit_px",
+        "gross_cost", "gross_proceeds", "pnl", "return_pct",
+        "hold_bars", "hold_minutes",
+    ]
+    if "regime_at_entry" in df.columns:
+        ordered.append("regime_at_entry")
+    # tolerate older trade dicts that may lack some columns
+    ordered = [c for c in ordered if c in df.columns]
+    df[ordered].to_csv(path, index=False)
+    return path
+
+
+# ---------------------------------------------------------------------------
 # main backtesting agent
 # ---------------------------------------------------------------------------
 
@@ -867,74 +1718,165 @@ class BacktestingAgent:
         start       = strategy.get("start", "2022-01-01")
         end         = strategy.get("end",   "2025-01-01")
         resample    = strategy.get("resample_to", None)
+        dump_trades = bool(strategy.get("dump_trades", False))   # write CSV per ticker
+        apply_mkt   = bool(strategy.get("apply_market_regime", False))   # gate by SPY bull/bear/vol
 
-        # find matching strategy signal function
+        # find matching strategy signal function. prefer exact match, then
+        # substring match — otherwise "foo" matches "foo_v2" before "foo_v2"
+        # gets its own chance (dict iteration order = insertion order).
         strategy_key = None
-        for key in STRATEGIES:
-            if key in name or name in key:
-                strategy_key = key
-                break
+        if name in STRATEGIES:
+            strategy_key = name
+        else:
+            for key in STRATEGIES:
+                if key in name or name in key:
+                    strategy_key = key
+                    break
 
         if not strategy_key:
-            strategy_key = "rsi_reversion"   # default fallback
-            self.log.warning(f"unknown strategy '{name}', defaulting to rsi_reversion")
+            # fail explicitly — silently aliasing to rsi_reversion produced
+            # meaningless results for novel strategies from autonomous_agent.
+            # downstream agents (risk, code) should treat this as "needs a
+            # signal function implementation before it can be validated".
+            self.log.warning(f"unknown strategy '{name}' — no signal function registered")
+            return {
+                "success":         False,
+                "reason":          f"no signal function registered for strategy '{name}'",
+                "needs_code_agent": True,
+                "requested_name":  name,
+                "requested_params": params,
+            }
 
-        fn, default_params = STRATEGIES[strategy_key]
-        merged_params      = {**default_params, **params}
+        entry          = STRATEGIES[strategy_key]
+        fn             = entry[0]
+        default_params = entry[1]
+        strategy_meta  = get_strategy_meta(strategy_key)
+        merged_params  = {**default_params, **params}
+        stop_mult      = merged_params.get("stop_atr_mult", ATR_STOP_MULT)
+        disable_stop   = bool(merged_params.get("disable_atr_stop", False))
+        max_hold       = merged_params.get("max_hold_bars")
+        allowed        = STRATEGY_REGIME_AFFINITY.get(strategy_key)
+        allowed_market = STRATEGY_MARKET_AFFINITY.get(strategy_key) if apply_mkt else None
 
-        self.log.info(f"backtesting {strategy_key} | tickers={tickers} | {start} to {end}")
+        # SPY-derived bull/bear/high_vol regime — computed once, reindexed
+        # per-ticker. only loaded when apply_market_regime is set.
+        spy_for_regime = None
+        if apply_mkt and allowed_market is not None:
+            try:
+                spy_for_regime = load_ticker(
+                    "SPY", data_dir=self.data_dir, start=start, end=end, session="regular",
+                )
+                self.log.info(f"  market regime gate ENABLED for {strategy_key}: allowed={allowed_market}")
+            except FileNotFoundError:
+                self.log.warning("SPY parquet missing — market regime gating disabled")
+                allowed_market = None
 
         all_results = {}
-        for ticker in tickers:
+
+        if strategy_meta.get("kind") == "multi":
+            # cross-asset: load all data_tickers, compute signal once, backtest
+            # only the tradeable ticker. caller's `tickers` field is ignored —
+            # the strategy itself dictates which tickers it needs.
+            data_tickers  = strategy_meta["data_tickers"]
+            tradeable     = strategy_meta["tradeable_ticker"]
+            self.log.info(f"backtesting {strategy_key} (multi-asset) | "
+                          f"data={data_tickers} tradeable={tradeable} | {start} to {end}")
             try:
-                df = load_ticker(
-                    ticker,
-                    data_dir  = self.data_dir,
-                    start     = start,
-                    end       = end,
-                    session   = "regular",
-                    resample_to = resample,
-                )
-
-                if len(df) < 100:
-                    self.log.warning(f"{ticker}: not enough data ({len(df)} bars)")
-                    continue
-
-                signal    = fn(df, merged_params)
-                stop_mult = merged_params.get("stop_atr_mult", ATR_STOP_MULT)
-                regime_s  = regime_label_series(df)
-                allowed   = STRATEGY_REGIME_AFFINITY.get(strategy_key)
-
-                results = run_backtest(
-                    df, signal,
-                    stop_atr_mult=stop_mult,
-                    regime_series=regime_s,
-                    allowed_regimes=allowed,
-                )
-                regimes = backtest_by_regime(
-                    results, df, signal,
-                    stop_atr_mult=stop_mult,
-                    regime_series=regime_s,
-                    allowed_regimes=allowed,
-                )
-
+                dfs = {t: load_ticker(t, data_dir=self.data_dir, start=start, end=end,
+                                      session="regular", resample_to=resample)
+                       for t in data_tickers}
+                signal   = fn(dfs, merged_params)
+                df       = dfs[tradeable]
+                regime_s = regime_label_series(df)
+                results  = run_backtest(df, signal, stop_atr_mult=stop_mult,
+                                        regime_series=regime_s, allowed_regimes=allowed,
+                                        disable_atr_stop=disable_stop, max_hold_bars=max_hold)
+                regimes  = backtest_by_regime(results, df, signal, stop_atr_mult=stop_mult,
+                                              regime_series=regime_s, allowed_regimes=allowed)
                 results["regime_breakdown"] = regimes
-                results.pop("trades", None)        # don't store full trade list in summary
+                if dump_trades and results.get("trades"):
+                    csv_path = dump_trades_to_csv(
+                        results["trades"], strategy_key, tradeable, regime_s,
+                    )
+                    if csv_path:
+                        self.log.info(f"  wrote {len(results['trades'])} trades to {csv_path}")
+                        results["trades_csv"] = str(csv_path)
+                results.pop("trades", None)
                 results.pop("equity_curve", None)
-
-                all_results[ticker] = results
-
+                all_results[tradeable] = results
                 self.log.info(
-                    f"{ticker} | sharpe={results['sharpe']:.2f} | "
-                    f"dd={results['max_drawdown']:.2%} | "
-                    f"wr={results['win_rate']:.2%} | "
+                    f"{tradeable} (multi) | sharpe={results['sharpe']:.2f} | "
+                    f"dd={results['max_drawdown']:.2%} | wr={results['win_rate']:.2%} | "
                     f"trades={results['total_trades']}"
                 )
-
-            except FileNotFoundError:
-                self.log.warning(f"{ticker}: parquet file not found")
+            except FileNotFoundError as e:
+                self.log.warning(f"multi-asset: parquet missing — {e}")
             except Exception as e:
-                self.log.exception(f"{ticker}: backtest failed — {e}")
+                self.log.exception(f"multi-asset backtest failed — {e}")
+
+        else:
+            self.log.info(f"backtesting {strategy_key} | tickers={tickers} | {start} to {end}")
+            for ticker in tickers:
+                try:
+                    df = load_ticker(
+                        ticker,
+                        data_dir  = self.data_dir,
+                        start     = start,
+                        end       = end,
+                        session   = "regular",
+                        resample_to = resample,
+                    )
+
+                    if len(df) < 100:
+                        self.log.warning(f"{ticker}: not enough data ({len(df)} bars)")
+                        continue
+
+                    signal   = fn(df, merged_params)
+                    regime_s = regime_label_series(df)
+                    mkt_s    = (market_regime_for_df(spy_for_regime, df)
+                                if spy_for_regime is not None else None)
+
+                    results = run_backtest(
+                        df, signal,
+                        stop_atr_mult=stop_mult,
+                        regime_series=regime_s,
+                        allowed_regimes=allowed,
+                        disable_atr_stop=disable_stop,
+                        max_hold_bars=max_hold,
+                        market_regime_series=mkt_s,
+                        allowed_market_regimes=allowed_market,
+                    )
+                    regimes = backtest_by_regime(
+                        results, df, signal,
+                        stop_atr_mult=stop_mult,
+                        regime_series=regime_s,
+                        allowed_regimes=allowed,
+                    )
+
+                    results["regime_breakdown"] = regimes
+                    if dump_trades and results.get("trades"):
+                        csv_path = dump_trades_to_csv(
+                            results["trades"], strategy_key, ticker, regime_s,
+                        )
+                        if csv_path:
+                            self.log.info(f"  wrote {len(results['trades'])} trades to {csv_path}")
+                            results["trades_csv"] = str(csv_path)
+                    results.pop("trades", None)        # don't store full trade list in summary
+                    results.pop("equity_curve", None)
+
+                    all_results[ticker] = results
+
+                    self.log.info(
+                        f"{ticker} | sharpe={results['sharpe']:.2f} | "
+                        f"dd={results['max_drawdown']:.2%} | "
+                        f"wr={results['win_rate']:.2%} | "
+                        f"trades={results['total_trades']}"
+                    )
+
+                except FileNotFoundError:
+                    self.log.warning(f"{ticker}: parquet file not found")
+                except Exception as e:
+                    self.log.exception(f"{ticker}: backtest failed — {e}")
 
         if not all_results:
             return {"success": False, "reason": "no results produced"}
@@ -981,7 +1923,8 @@ if __name__ == "__main__":
 
     all_scores = []
 
-    for strategy_name, (_, default_params) in STRATEGIES.items():
+    for strategy_name, entry in STRATEGIES.items():
+        default_params = entry[1]
         if not default_params.get("active", True):
             print(f"strategy: {strategy_name}  [INACTIVE — skipped]")
             print()

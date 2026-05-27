@@ -1,0 +1,3628 @@
+{
+  "strategies": {
+    "5a8eb974": {
+      "id": "5a8eb974",
+      "name": "RSI mean reversion",
+      "source_agent": "autonomous_agent",
+      "description": "buy oversold, sell overbought on 1m RSI",
+      "params": {
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70
+      },
+      "status": "paper_trading",
+      "backtest_results": {
+        "sharpe": 1.42,
+        "max_drawdown": -0.08,
+        "win_rate": 0.54,
+        "calmar": 1.8,
+        "total_trades": 312,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "risk_results": {
+        "passed": true,
+        "failures": [],
+        "thresholds_used": {
+          "min_sharpe": 0.8,
+          "max_drawdown": -0.15,
+          "min_win_rate": 0.45,
+          "min_trades": 50
+        }
+      },
+      "code_path": "strategies/5a8eb974_strategy.py",
+      "paper_results": null,
+      "created_at": "2026-05-25T21:15:51.366172",
+      "updated_at": "2026-05-25T21:15:51.372755",
+      "history": [
+        {
+          "timestamp": "2026-05-25T21:15:51.367205",
+          "changes": {
+            "status": "backtesting"
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.368285",
+          "changes": {
+            "backtest_results": {
+              "sharpe": 1.42,
+              "max_drawdown": -0.08,
+              "win_rate": 0.54,
+              "calmar": 1.8,
+              "total_trades": 312,
+              "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+            }
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.369245",
+          "changes": {
+            "status": "risk_review"
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.370314",
+          "changes": {
+            "status": "approved",
+            "risk_results": {
+              "passed": true,
+              "failures": [],
+              "thresholds_used": {
+                "min_sharpe": 0.8,
+                "max_drawdown": -0.15,
+                "min_win_rate": 0.45,
+                "min_trades": 50
+              }
+            }
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.371422",
+          "changes": {
+            "status": "implementing"
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.372758",
+          "changes": {
+            "status": "paper_trading",
+            "code_path": "strategies/5a8eb974_strategy.py"
+          }
+        }
+      ]
+    },
+    "3f11ec73": {
+      "id": "3f11ec73",
+      "name": "open range breakout fade",
+      "source_agent": "autonomous_agent",
+      "description": "first 15min range is often faded by 10:30am on low-vol days",
+      "params": {
+        "open_range_minutes": 15,
+        "fade_target_pct": 0.5
+      },
+      "status": "paper_trading",
+      "backtest_results": {
+        "sharpe": 1.42,
+        "max_drawdown": -0.08,
+        "win_rate": 0.54,
+        "calmar": 1.8,
+        "total_trades": 312,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "risk_results": {
+        "passed": true,
+        "failures": [],
+        "thresholds_used": {
+          "min_sharpe": 0.8,
+          "max_drawdown": -0.15,
+          "min_win_rate": 0.45,
+          "min_trades": 50
+        }
+      },
+      "code_path": "strategies/3f11ec73_strategy.py",
+      "paper_results": null,
+      "created_at": "2026-05-25T21:15:51.374271",
+      "updated_at": "2026-05-25T21:15:51.384443",
+      "history": [
+        {
+          "timestamp": "2026-05-25T21:15:51.375514",
+          "changes": {
+            "status": "backtesting"
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.377687",
+          "changes": {
+            "backtest_results": {
+              "sharpe": 1.42,
+              "max_drawdown": -0.08,
+              "win_rate": 0.54,
+              "calmar": 1.8,
+              "total_trades": 312,
+              "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+            }
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.379413",
+          "changes": {
+            "status": "risk_review"
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.380997",
+          "changes": {
+            "status": "approved",
+            "risk_results": {
+              "passed": true,
+              "failures": [],
+              "thresholds_used": {
+                "min_sharpe": 0.8,
+                "max_drawdown": -0.15,
+                "min_win_rate": 0.45,
+                "min_trades": 50
+              }
+            }
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.382577",
+          "changes": {
+            "status": "implementing"
+          }
+        },
+        {
+          "timestamp": "2026-05-25T21:15:51.384446",
+          "changes": {
+            "status": "paper_trading",
+            "code_path": "strategies/3f11ec73_strategy.py"
+          }
+        }
+      ]
+    },
+    "fa492df2": {
+      "id": "fa492df2",
+      "name": "opening_auction_imbalance_fade",
+      "source_agent": "autonomous_agent",
+      "description": "Cash open over-extends opening auction imbalance; reverts within 30-45 min.",
+      "params": {
+        "imbalance_lookback_min": 5,
+        "entry_minute_after_open": 10,
+        "extension_threshold_atr": 1.25,
+        "exit_minute": 45,
+        "stop_atr": 0.75
+      },
+      "status": "rejected",
+      "backtest_results": null,
+      "risk_results": null,
+      "code_path": null,
+      "paper_results": null,
+      "created_at": "2026-05-26T06:22:37.392991",
+      "updated_at": "2026-05-26T06:22:37.411115",
+      "history": [
+        {
+          "timestamp": "2026-05-26T06:22:37.397320",
+          "changes": {
+            "status": "backtesting"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:22:37.411122",
+          "changes": {
+            "status": "rejected"
+          }
+        }
+      ]
+    },
+    "29f0f13d": {
+      "id": "29f0f13d",
+      "name": "qqq_spy_dispersion_snapback",
+      "source_agent": "autonomous_agent",
+      "description": "QQQ-vs-SPY beta-adjusted residual mean-reverts intraday.",
+      "params": {
+        "beta_lookback_min": 60,
+        "zscore_lookback_min": 30,
+        "entry_z": 2.0,
+        "exit_z": 0.3,
+        "max_hold_min": 20,
+        "stop_z": 3.5
+      },
+      "status": "rejected",
+      "backtest_results": null,
+      "risk_results": null,
+      "code_path": null,
+      "paper_results": null,
+      "created_at": "2026-05-26T06:22:37.415487",
+      "updated_at": "2026-05-26T06:22:37.433880",
+      "history": [
+        {
+          "timestamp": "2026-05-26T06:22:37.419979",
+          "changes": {
+            "status": "backtesting"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:22:37.433887",
+          "changes": {
+            "status": "rejected"
+          }
+        }
+      ]
+    },
+    "b8934acb": {
+      "id": "b8934acb",
+      "name": "lunch_lull_breakout_continuation",
+      "source_agent": "autonomous_agent",
+      "description": "Narrow 11:30-13:30 ET consolidation breakouts continue into close.",
+      "params": {
+        "max_range_pct_of_atr": 0.5,
+        "breakout_volume_mult": 1.8,
+        "min_consolidation_bars": 12
+      },
+      "status": "rejected",
+      "backtest_results": null,
+      "risk_results": null,
+      "code_path": null,
+      "paper_results": null,
+      "created_at": "2026-05-26T06:22:37.438788",
+      "updated_at": "2026-05-26T06:22:37.457250",
+      "history": [
+        {
+          "timestamp": "2026-05-26T06:22:37.443319",
+          "changes": {
+            "status": "backtesting"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:22:37.457258",
+          "changes": {
+            "status": "rejected"
+          }
+        }
+      ]
+    },
+    "cd0ec383": {
+      "id": "cd0ec383",
+      "name": "lunch_lull_breakout_continuation",
+      "source_agent": "autonomous_agent",
+      "description": "Long when price breaks above the 11:30-13:30 ET range AFTER 13:30, Short when it breaks below. Exit at close (15:55). Stop at consolidation midpoint. Only fire on days where the 11:30-13:30 range is less than 0.5 * 20-day ATR.",
+      "params": {
+        "consolidation_start_et": "11:30",
+        "consolidation_end_et": "13:30",
+        "entry_window_start_et": "13:30",
+        "entry_window_end_et": "14:30",
+        "exit_time_et": "15:55",
+        "max_range_pct_of_atr": 0.5,
+        "breakout_volume_mult": 1.8,
+        "min_consolidation_bars": 12
+      },
+      "status": "rejected",
+      "backtest_results": null,
+      "risk_results": null,
+      "code_path": null,
+      "paper_results": null,
+      "created_at": "2026-05-26T06:44:52.771631",
+      "updated_at": "2026-05-26T06:44:52.794197",
+      "history": [
+        {
+          "timestamp": "2026-05-26T06:44:52.778132",
+          "changes": {
+            "status": "implementing"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:44:52.794204",
+          "changes": {
+            "status": "rejected"
+          }
+        }
+      ]
+    },
+    "1b1f4ea2": {
+      "id": "1b1f4ea2",
+      "name": "lunch_lull_breakout_continuation",
+      "source_agent": "autonomous_agent",
+      "description": "Long when price breaks above the 11:30-13:30 ET range AFTER 13:30, Short when it breaks below. Exit at close (15:55). Stop at consolidation midpoint. Only fire on days where the 11:30-13:30 range is less than 0.5 * 20-day ATR.",
+      "params": {
+        "consolidation_start_et": "11:30",
+        "consolidation_end_et": "13:30",
+        "entry_window_start_et": "13:30",
+        "entry_window_end_et": "14:30",
+        "exit_time_et": "15:55",
+        "max_range_pct_of_atr": 0.5,
+        "breakout_volume_mult": 1.8,
+        "min_consolidation_bars": 12
+      },
+      "status": "rejected",
+      "backtest_results": {
+        "sharpe": 0.0,
+        "max_drawdown": 0.0,
+        "win_rate": 0.0,
+        "total_trades": 0,
+        "calmar": 0.0
+      },
+      "risk_results": {
+        "passed": false,
+        "failures": [
+          "sharpe 0.000 < 0.8",
+          "win rate 0.00% < 45.00%",
+          "only 0 trades, need 50"
+        ],
+        "warnings": [],
+        "thresholds_used": {
+          "min_sharpe": 0.8,
+          "max_drawdown": -0.15,
+          "min_win_rate": 0.45,
+          "min_trades": 50,
+          "max_position_pct": 0.1
+        },
+        "checked_fields": {
+          "sharpe": 0.0,
+          "max_drawdown": 0.0,
+          "win_rate": 0.0,
+          "total_trades": 0
+        },
+        "strategy_id": "1b1f4ea2"
+      },
+      "code_path": "strategies\\1b1f4ea2_lunch_lull_breakout_continuation.py",
+      "paper_results": null,
+      "created_at": "2026-05-26T06:45:37.040444",
+      "updated_at": "2026-05-26T06:46:41.234904",
+      "history": [
+        {
+          "timestamp": "2026-05-26T06:45:37.046025",
+          "changes": {
+            "status": "implementing"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:46:06.636820",
+          "changes": {
+            "status": "implementing",
+            "code_path": "strategies\\1b1f4ea2_lunch_lull_breakout_continuation.py"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:46:06.648396",
+          "changes": {
+            "status": "backtesting"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:46:41.213367",
+          "changes": {
+            "backtest_results": {
+              "sharpe": 0.0,
+              "max_drawdown": 0.0,
+              "win_rate": 0.0,
+              "total_trades": 0,
+              "calmar": 0.0
+            }
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:46:41.223995",
+          "changes": {
+            "status": "risk_review"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T06:46:41.234918",
+          "changes": {
+            "status": "rejected",
+            "risk_results": {
+              "passed": false,
+              "failures": [
+                "sharpe 0.000 < 0.8",
+                "win rate 0.00% < 45.00%",
+                "only 0 trades, need 50"
+              ],
+              "warnings": [],
+              "thresholds_used": {
+                "min_sharpe": 0.8,
+                "max_drawdown": -0.15,
+                "min_win_rate": 0.45,
+                "min_trades": 50,
+                "max_position_pct": 0.1
+              },
+              "checked_fields": {
+                "sharpe": 0.0,
+                "max_drawdown": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0
+              },
+              "strategy_id": "1b1f4ea2"
+            }
+          }
+        }
+      ]
+    },
+    "2b81c559": {
+      "id": "2b81c559",
+      "name": "qqq_spy_dispersion",
+      "source_agent": "autonomous_agent",
+      "description": "Trade QQQ when its residual vs SPY (beta-hedged) exceeds 2 sigma; exit at 0.3 sigma.",
+      "params": {
+        "beta_lookback_min": 60,
+        "zscore_lookback_min": 30,
+        "entry_z": 2.0,
+        "exit_z": 0.3
+      },
+      "status": "rejected",
+      "backtest_results": {
+        "sharpe": -44.6512,
+        "max_drawdown": -0.716538,
+        "win_rate": 0.2208,
+        "total_trades": 9435,
+        "calmar": -1.0
+      },
+      "risk_results": {
+        "passed": false,
+        "failures": [
+          "sharpe -44.651 < 0.8",
+          "max drawdown -71.65% < -15.00%",
+          "win rate 22.08% < 45.00%"
+        ],
+        "warnings": [],
+        "thresholds_used": {
+          "min_sharpe": 0.8,
+          "max_drawdown": -0.15,
+          "min_win_rate": 0.45,
+          "min_trades": 50,
+          "max_position_pct": 0.1
+        },
+        "checked_fields": {
+          "sharpe": -44.6512,
+          "max_drawdown": -0.716538,
+          "win_rate": 0.2208,
+          "total_trades": 9435
+        },
+        "strategy_id": "2b81c559"
+      },
+      "code_path": null,
+      "paper_results": null,
+      "created_at": "2026-05-26T07:14:36.291199",
+      "updated_at": "2026-05-26T07:14:48.938769",
+      "history": [
+        {
+          "timestamp": "2026-05-26T07:14:36.297287",
+          "changes": {
+            "status": "backtesting"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T07:14:48.911490",
+          "changes": {
+            "backtest_results": {
+              "sharpe": -44.6512,
+              "max_drawdown": -0.716538,
+              "win_rate": 0.2208,
+              "total_trades": 9435,
+              "calmar": -1.0
+            }
+          }
+        },
+        {
+          "timestamp": "2026-05-26T07:14:48.923007",
+          "changes": {
+            "status": "risk_review"
+          }
+        },
+        {
+          "timestamp": "2026-05-26T07:14:48.938776",
+          "changes": {
+            "status": "rejected",
+            "risk_results": {
+              "passed": false,
+              "failures": [
+                "sharpe -44.651 < 0.8",
+                "max drawdown -71.65% < -15.00%",
+                "win rate 22.08% < 45.00%"
+              ],
+              "warnings": [],
+              "thresholds_used": {
+                "min_sharpe": 0.8,
+                "max_drawdown": -0.15,
+                "min_win_rate": 0.45,
+                "min_trades": 50,
+                "max_position_pct": 0.1
+              },
+              "checked_fields": {
+                "sharpe": -44.6512,
+                "max_drawdown": -0.716538,
+                "win_rate": 0.2208,
+                "total_trades": 9435
+              },
+              "strategy_id": "2b81c559"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "04bae9d0": {
+      "task_id": "04bae9d0",
+      "agent": "research_agent",
+      "action": "scan_strategies",
+      "payload": {},
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "research_agent",
+        "strategies_found": [
+          {
+            "name": "RSI mean reversion",
+            "description": "buy oversold, sell overbought on 1m RSI",
+            "params": {
+              "rsi_period": 14,
+              "oversold": 30,
+              "overbought": 70
+            },
+            "source": "stub"
+          }
+        ]
+      },
+      "created_at": "2026-05-25T21:15:51.363156",
+      "completed_at": "2026-05-25T21:15:51.364471"
+    },
+    "b5008619": {
+      "task_id": "b5008619",
+      "agent": "autonomous_agent",
+      "action": "generate_ideas",
+      "payload": {},
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "autonomous_agent",
+        "ideas": [
+          {
+            "name": "open range breakout fade",
+            "hypothesis": "first 15min range is often faded by 10:30am on low-vol days",
+            "params": {
+              "open_range_minutes": 15,
+              "fade_target_pct": 0.5
+            }
+          }
+        ]
+      },
+      "created_at": "2026-05-25T21:15:51.365129",
+      "completed_at": "2026-05-25T21:15:51.365654"
+    },
+    "231c222f": {
+      "task_id": "231c222f",
+      "agent": "backtesting_agent",
+      "action": "run_backtest",
+      "payload": {},
+      "strategy_id": "5a8eb974",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "backtesting_agent",
+        "backtest_results": {
+          "sharpe": 1.42,
+          "max_drawdown": -0.08,
+          "win_rate": 0.54,
+          "calmar": 1.8,
+          "total_trades": 312,
+          "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.367733",
+      "completed_at": "2026-05-25T21:15:51.368796"
+    },
+    "a382c618": {
+      "task_id": "a382c618",
+      "agent": "risk_agent",
+      "action": "validate",
+      "payload": {},
+      "strategy_id": "5a8eb974",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "risk_agent",
+        "risk_results": {
+          "passed": true,
+          "failures": [],
+          "thresholds_used": {
+            "min_sharpe": 0.8,
+            "max_drawdown": -0.15,
+            "min_win_rate": 0.45,
+            "min_trades": 50
+          }
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.369767",
+      "completed_at": "2026-05-25T21:15:51.370897"
+    },
+    "f0052eb1": {
+      "task_id": "f0052eb1",
+      "agent": "code_agent",
+      "action": "implement",
+      "payload": {},
+      "strategy_id": "5a8eb974",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "code_agent",
+        "code_path": "strategies/5a8eb974_strategy.py"
+      },
+      "created_at": "2026-05-25T21:15:51.372037",
+      "completed_at": "2026-05-25T21:15:51.373609"
+    },
+    "ca346ad7": {
+      "task_id": "ca346ad7",
+      "agent": "backtesting_agent",
+      "action": "run_backtest",
+      "payload": {},
+      "strategy_id": "3f11ec73",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "backtesting_agent",
+        "backtest_results": {
+          "sharpe": 1.42,
+          "max_drawdown": -0.08,
+          "win_rate": 0.54,
+          "calmar": 1.8,
+          "total_trades": 312,
+          "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.376740",
+      "completed_at": "2026-05-25T21:15:51.378678"
+    },
+    "c84c393f": {
+      "task_id": "c84c393f",
+      "agent": "risk_agent",
+      "action": "validate",
+      "payload": {},
+      "strategy_id": "3f11ec73",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "risk_agent",
+        "risk_results": {
+          "passed": true,
+          "failures": [],
+          "thresholds_used": {
+            "min_sharpe": 0.8,
+            "max_drawdown": -0.15,
+            "min_win_rate": 0.45,
+            "min_trades": 50
+          }
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.380178",
+      "completed_at": "2026-05-25T21:15:51.381826"
+    },
+    "abe3d41a": {
+      "task_id": "abe3d41a",
+      "agent": "code_agent",
+      "action": "implement",
+      "payload": {},
+      "strategy_id": "3f11ec73",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "code_agent",
+        "code_path": "strategies/3f11ec73_strategy.py"
+      },
+      "created_at": "2026-05-25T21:15:51.383461",
+      "completed_at": "2026-05-25T21:15:51.385322"
+    },
+    "89d1c3ff": {
+      "task_id": "89d1c3ff",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AAPL",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "AAPL",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.387016",
+      "completed_at": "2026-05-25T21:15:51.389644"
+    },
+    "073fa3a8": {
+      "task_id": "073fa3a8",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AAPL",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "AAPL",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.390524",
+      "completed_at": "2026-05-25T21:15:51.392645"
+    },
+    "9e82acb2": {
+      "task_id": "9e82acb2",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AAPL",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "AAPL",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.393579",
+      "completed_at": "2026-05-25T21:15:51.395765"
+    },
+    "5944a566": {
+      "task_id": "5944a566",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AMD",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "AMD",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.396726",
+      "completed_at": "2026-05-25T21:15:51.398925"
+    },
+    "e8545d93": {
+      "task_id": "e8545d93",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AMD",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "AMD",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.399912",
+      "completed_at": "2026-05-25T21:15:51.402615"
+    },
+    "10b1890d": {
+      "task_id": "10b1890d",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AMD",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "AMD",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.403927",
+      "completed_at": "2026-05-25T21:15:51.406484"
+    },
+    "9d66f409": {
+      "task_id": "9d66f409",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AMZN",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "AMZN",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.408505",
+      "completed_at": "2026-05-25T21:15:51.411167"
+    },
+    "570e3941": {
+      "task_id": "570e3941",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AMZN",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "AMZN",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.412363",
+      "completed_at": "2026-05-25T21:15:51.414989"
+    },
+    "7eb1855b": {
+      "task_id": "7eb1855b",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "AMZN",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "AMZN",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.416694",
+      "completed_at": "2026-05-25T21:15:51.419342"
+    },
+    "67ff1bc0": {
+      "task_id": "67ff1bc0",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CAT",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "CAT",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.420649",
+      "completed_at": "2026-05-25T21:15:51.423771"
+    },
+    "0d849d27": {
+      "task_id": "0d849d27",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CAT",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "CAT",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.425177",
+      "completed_at": "2026-05-25T21:15:51.428010"
+    },
+    "fd660d6a": {
+      "task_id": "fd660d6a",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CAT",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "CAT",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.429368",
+      "completed_at": "2026-05-25T21:15:51.432938"
+    },
+    "53272589": {
+      "task_id": "53272589",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CHWY",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "CHWY",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.434483",
+      "completed_at": "2026-05-25T21:15:51.438094"
+    },
+    "dbb4e3d4": {
+      "task_id": "dbb4e3d4",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CHWY",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "CHWY",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.439678",
+      "completed_at": "2026-05-25T21:15:51.442794"
+    },
+    "8e42fb45": {
+      "task_id": "8e42fb45",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CHWY",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "CHWY",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.444782",
+      "completed_at": "2026-05-25T21:15:51.448887"
+    },
+    "56d47480": {
+      "task_id": "56d47480",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CVNA",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "CVNA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.450566",
+      "completed_at": "2026-05-25T21:15:51.454360"
+    },
+    "f22966b2": {
+      "task_id": "f22966b2",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CVNA",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "CVNA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.456187",
+      "completed_at": "2026-05-25T21:15:51.460868"
+    },
+    "d31924ce": {
+      "task_id": "d31924ce",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "CVNA",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "CVNA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.462786",
+      "completed_at": "2026-05-25T21:15:51.466642"
+    },
+    "aa73c9a6": {
+      "task_id": "aa73c9a6",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GLD",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "GLD",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.468684",
+      "completed_at": "2026-05-25T21:15:51.474172"
+    },
+    "c8f04873": {
+      "task_id": "c8f04873",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GLD",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "GLD",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.476316",
+      "completed_at": "2026-05-25T21:15:51.481141"
+    },
+    "08a1cf45": {
+      "task_id": "08a1cf45",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GLD",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "GLD",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.483073",
+      "completed_at": "2026-05-25T21:15:51.488121"
+    },
+    "694a4005": {
+      "task_id": "694a4005",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GOOGL",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "GOOGL",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.490093",
+      "completed_at": "2026-05-25T21:15:51.494988"
+    },
+    "73476888": {
+      "task_id": "73476888",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GOOGL",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "GOOGL",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.497182",
+      "completed_at": "2026-05-25T21:15:51.501551"
+    },
+    "b33a311e": {
+      "task_id": "b33a311e",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GOOGL",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "GOOGL",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.503568",
+      "completed_at": "2026-05-25T21:15:51.508112"
+    },
+    "c7321e81": {
+      "task_id": "c7321e81",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GS",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "GS",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.510260",
+      "completed_at": "2026-05-25T21:15:51.515413"
+    },
+    "604830f1": {
+      "task_id": "604830f1",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GS",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "GS",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.518458",
+      "completed_at": "2026-05-25T21:15:51.523543"
+    },
+    "546aa368": {
+      "task_id": "546aa368",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "GS",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "GS",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.525768",
+      "completed_at": "2026-05-25T21:15:51.532038"
+    },
+    "92fc0e91": {
+      "task_id": "92fc0e91",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "JPM",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "JPM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.534801",
+      "completed_at": "2026-05-25T21:15:51.540026"
+    },
+    "e2dfb985": {
+      "task_id": "e2dfb985",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "JPM",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "JPM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.542538",
+      "completed_at": "2026-05-25T21:15:51.548452"
+    },
+    "65444129": {
+      "task_id": "65444129",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "JPM",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "JPM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.551008",
+      "completed_at": "2026-05-25T21:15:51.556892"
+    },
+    "f0e2c70c": {
+      "task_id": "f0e2c70c",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "MSFT",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "MSFT",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.559418",
+      "completed_at": "2026-05-25T21:15:51.565399"
+    },
+    "d2de60f6": {
+      "task_id": "d2de60f6",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "MSFT",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "MSFT",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.567982",
+      "completed_at": "2026-05-25T21:15:51.573536"
+    },
+    "35aca557": {
+      "task_id": "35aca557",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "MSFT",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "MSFT",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.576000",
+      "completed_at": "2026-05-25T21:15:51.581653"
+    },
+    "a83983df": {
+      "task_id": "a83983df",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NET",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "NET",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.584706",
+      "completed_at": "2026-05-25T21:15:51.590731"
+    },
+    "b440b145": {
+      "task_id": "b440b145",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NET",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "NET",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.593203",
+      "completed_at": "2026-05-25T21:15:51.599895"
+    },
+    "c969d4bf": {
+      "task_id": "c969d4bf",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NET",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "NET",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.602835",
+      "completed_at": "2026-05-25T21:15:51.609320"
+    },
+    "132d2dd5": {
+      "task_id": "132d2dd5",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NFLX",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "NFLX",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.612233",
+      "completed_at": "2026-05-25T21:15:51.619103"
+    },
+    "0e169744": {
+      "task_id": "0e169744",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NFLX",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "NFLX",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.621917",
+      "completed_at": "2026-05-25T21:15:51.630174"
+    },
+    "50c69053": {
+      "task_id": "50c69053",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NFLX",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "NFLX",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.634995",
+      "completed_at": "2026-05-25T21:15:51.642953"
+    },
+    "7f1136a0": {
+      "task_id": "7f1136a0",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NVDA",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "NVDA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.645879",
+      "completed_at": "2026-05-25T21:15:51.652692"
+    },
+    "525151ce": {
+      "task_id": "525151ce",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NVDA",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "NVDA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.655614",
+      "completed_at": "2026-05-25T21:15:51.663145"
+    },
+    "6b406b85": {
+      "task_id": "6b406b85",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "NVDA",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "NVDA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.666721",
+      "completed_at": "2026-05-25T21:15:51.673931"
+    },
+    "f7ded340": {
+      "task_id": "f7ded340",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "QQQ",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "QQQ",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.676980",
+      "completed_at": "2026-05-25T21:15:51.683874"
+    },
+    "f1e7d63f": {
+      "task_id": "f1e7d63f",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "QQQ",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "QQQ",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.686881",
+      "completed_at": "2026-05-25T21:15:51.694077"
+    },
+    "3d78caea": {
+      "task_id": "3d78caea",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "QQQ",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "QQQ",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.697114",
+      "completed_at": "2026-05-25T21:15:51.705801"
+    },
+    "ba546d7f": {
+      "task_id": "ba546d7f",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "SE",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "SE",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.709329",
+      "completed_at": "2026-05-25T21:15:51.717192"
+    },
+    "04818d6a": {
+      "task_id": "04818d6a",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "SE",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "SE",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.721398",
+      "completed_at": "2026-05-25T21:15:51.729541"
+    },
+    "edfb35ff": {
+      "task_id": "edfb35ff",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "SE",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "SE",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.732759",
+      "completed_at": "2026-05-25T21:15:51.740794"
+    },
+    "6fd176df": {
+      "task_id": "6fd176df",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "SPY",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "SPY",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.744115",
+      "completed_at": "2026-05-25T21:15:51.752145"
+    },
+    "a0819c80": {
+      "task_id": "a0819c80",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "SPY",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "SPY",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.755850",
+      "completed_at": "2026-05-25T21:15:51.763498"
+    },
+    "5826825e": {
+      "task_id": "5826825e",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "SPY",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "SPY",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.767579",
+      "completed_at": "2026-05-25T21:15:51.775468"
+    },
+    "403a3b8f": {
+      "task_id": "403a3b8f",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TEM",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "TEM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.779132",
+      "completed_at": "2026-05-25T21:15:51.787815"
+    },
+    "1008b5d6": {
+      "task_id": "1008b5d6",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TEM",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "TEM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.791594",
+      "completed_at": "2026-05-25T21:15:51.799598"
+    },
+    "c841cac4": {
+      "task_id": "c841cac4",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TEM",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "TEM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.803494",
+      "completed_at": "2026-05-25T21:15:51.812040"
+    },
+    "36716313": {
+      "task_id": "36716313",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TSLA",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "TSLA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.816247",
+      "completed_at": "2026-05-25T21:15:51.824026"
+    },
+    "eea1a51a": {
+      "task_id": "eea1a51a",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TSLA",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "TSLA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.828106",
+      "completed_at": "2026-05-25T21:15:51.836753"
+    },
+    "163bc574": {
+      "task_id": "163bc574",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TSLA",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "TSLA",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.840401",
+      "completed_at": "2026-05-25T21:15:51.850034"
+    },
+    "44e3a412": {
+      "task_id": "44e3a412",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TSM",
+        "model": "xgboost",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "xgboost",
+          "ticker": "TSM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.853880",
+      "completed_at": "2026-05-25T21:15:51.862486"
+    },
+    "dd7f8c9b": {
+      "task_id": "dd7f8c9b",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TSM",
+        "model": "lstm",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "lstm",
+          "ticker": "TSM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.866959",
+      "completed_at": "2026-05-25T21:15:51.875883"
+    },
+    "05189eb8": {
+      "task_id": "05189eb8",
+      "agent": "ml_research_agent",
+      "action": "train_model",
+      "payload": {
+        "ticker": "TSM",
+        "model": "transformer",
+        "window_days": 365,
+        "data_dir": "C:\\Users\\pcagm\\Downloads\\StockData"
+      },
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "ml_research_agent",
+        "metrics": {
+          "model": "transformer",
+          "ticker": "TSM",
+          "window_days": 365,
+          "accuracy": 0.54,
+          "sharpe": 1.1,
+          "auc": 0.61
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.879954",
+      "completed_at": "2026-05-25T21:15:51.888398"
+    },
+    "4570f430": {
+      "task_id": "4570f430",
+      "agent": "monitor_agent",
+      "action": "check_positions",
+      "payload": {},
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "monitor_agent",
+        "monitor_status": {
+          "active_positions": 0,
+          "unrealized_pnl": 0.0,
+          "alerts": [],
+          "all_clear": true
+        }
+      },
+      "created_at": "2026-05-25T21:15:51.892798",
+      "completed_at": "2026-05-25T21:15:51.897120"
+    },
+    "f5e0e25c": {
+      "task_id": "f5e0e25c",
+      "agent": "monitor_agent",
+      "action": "check",
+      "payload": {},
+      "strategy_id": null,
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "monitor_agent",
+        "monitor_status": {
+          "mode": "alpaca_paper",
+          "active_positions": 0,
+          "portfolio_value": 100000.0,
+          "last_equity": 100000.0,
+          "day_drawdown_pct": 0.0,
+          "unrealized_pnl": 0,
+          "alerts": [],
+          "actions_requested": [],
+          "all_clear": true,
+          "checked_at": "2026-05-26T04:25:47.069704+00:00"
+        }
+      },
+      "created_at": "2026-05-26T04:25:46.503847",
+      "completed_at": "2026-05-26T04:25:47.069731"
+    },
+    "d39e1a70": {
+      "task_id": "d39e1a70",
+      "agent": "backtesting_agent",
+      "action": "run_backtest",
+      "payload": {},
+      "strategy_id": "fa492df2",
+      "status": "failed",
+      "result": {
+        "success": false,
+        "agent": "backtesting_agent",
+        "reason": "no signal function registered for strategy 'opening_auction_imbalance_fade'",
+        "raw": {
+          "success": false,
+          "reason": "no signal function registered for strategy 'opening_auction_imbalance_fade'",
+          "needs_code_agent": true,
+          "requested_name": "opening_auction_imbalance_fade",
+          "requested_params": {
+            "imbalance_lookback_min": 5,
+            "entry_minute_after_open": 10,
+            "extension_threshold_atr": 1.25,
+            "exit_minute": 45,
+            "stop_atr": 0.75
+          }
+        }
+      },
+      "created_at": "2026-05-26T06:22:37.401811",
+      "completed_at": "2026-05-26T06:22:37.406632"
+    },
+    "c65a01cd": {
+      "task_id": "c65a01cd",
+      "agent": "backtesting_agent",
+      "action": "run_backtest",
+      "payload": {},
+      "strategy_id": "29f0f13d",
+      "status": "failed",
+      "result": {
+        "success": false,
+        "agent": "backtesting_agent",
+        "reason": "no signal function registered for strategy 'qqq_spy_dispersion_snapback'",
+        "raw": {
+          "success": false,
+          "reason": "no signal function registered for strategy 'qqq_spy_dispersion_snapback'",
+          "needs_code_agent": true,
+          "requested_name": "qqq_spy_dispersion_snapback",
+          "requested_params": {
+            "beta_lookback_min": 60,
+            "zscore_lookback_min": 30,
+            "entry_z": 2.0,
+            "exit_z": 0.3,
+            "max_hold_min": 20,
+            "stop_z": 3.5
+          }
+        }
+      },
+      "created_at": "2026-05-26T06:22:37.424956",
+      "completed_at": "2026-05-26T06:22:37.429499"
+    },
+    "8627af48": {
+      "task_id": "8627af48",
+      "agent": "backtesting_agent",
+      "action": "run_backtest",
+      "payload": {},
+      "strategy_id": "b8934acb",
+      "status": "failed",
+      "result": {
+        "success": false,
+        "agent": "backtesting_agent",
+        "reason": "no signal function registered for strategy 'lunch_lull_breakout_continuation'",
+        "raw": {
+          "success": false,
+          "reason": "no signal function registered for strategy 'lunch_lull_breakout_continuation'",
+          "needs_code_agent": true,
+          "requested_name": "lunch_lull_breakout_continuation",
+          "requested_params": {
+            "max_range_pct_of_atr": 0.5,
+            "breakout_volume_mult": 1.8,
+            "min_consolidation_bars": 12
+          }
+        }
+      },
+      "created_at": "2026-05-26T06:22:37.447879",
+      "completed_at": "2026-05-26T06:22:37.452754"
+    },
+    "5060020e": {
+      "task_id": "5060020e",
+      "agent": "code_agent",
+      "action": "implement",
+      "payload": {},
+      "strategy_id": "cd0ec383",
+      "status": "failed",
+      "result": {
+        "success": false,
+        "agent": "code_agent",
+        "reason": "sdk call failed: '-1, 0, 1'"
+      },
+      "created_at": "2026-05-26T06:44:52.782623",
+      "completed_at": "2026-05-26T06:44:52.789716"
+    },
+    "372b9313": {
+      "task_id": "372b9313",
+      "agent": "code_agent",
+      "action": "implement",
+      "payload": {},
+      "strategy_id": "1b1f4ea2",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "code_agent",
+        "code_path": "strategies\\1b1f4ea2_lunch_lull_breakout_continuation.py",
+        "registered": true
+      },
+      "created_at": "2026-05-26T06:45:37.051174",
+      "completed_at": "2026-05-26T06:46:06.642749"
+    },
+    "19631f8b": {
+      "task_id": "19631f8b",
+      "agent": "backtesting_agent",
+      "action": "run_backtest",
+      "payload": {},
+      "strategy_id": "1b1f4ea2",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "backtesting_agent",
+        "strategy": "lunch_lull_breakout_continuation",
+        "params": {
+          "consolidation_start_et": "11:30",
+          "consolidation_end_et": "13:30",
+          "entry_window_start_et": "13:30",
+          "entry_window_end_et": "14:30",
+          "exit_time_et": "15:55",
+          "max_range_pct_of_atr": 0.5,
+          "breakout_volume_mult": 1.8,
+          "min_consolidation_bars": 12,
+          "stop_atr_mult": 2.0,
+          "active": true
+        },
+        "tickers_tested": [
+          "SPY",
+          "QQQ",
+          "TSLA",
+          "NVDA",
+          "AAPL"
+        ],
+        "per_ticker": {
+          "SPY": {
+            "total_return": 0.0,
+            "final_capital": 100000,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "calmar": 0.0,
+            "win_rate": 0.0,
+            "total_trades": 0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "avg_bars_held": 0.0,
+            "profit_factor": 0.0,
+            "regime_breakdown": {
+              "open": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "midday": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "close": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              }
+            }
+          },
+          "QQQ": {
+            "total_return": 0.0,
+            "final_capital": 100000,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "calmar": 0.0,
+            "win_rate": 0.0,
+            "total_trades": 0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "avg_bars_held": 0.0,
+            "profit_factor": 0.0,
+            "regime_breakdown": {
+              "open": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "midday": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "close": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              }
+            }
+          },
+          "TSLA": {
+            "total_return": 0.0,
+            "final_capital": 100000,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "calmar": 0.0,
+            "win_rate": 0.0,
+            "total_trades": 0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "avg_bars_held": 0.0,
+            "profit_factor": 0.0,
+            "regime_breakdown": {
+              "open": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "midday": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "close": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              }
+            }
+          },
+          "NVDA": {
+            "total_return": 0.0,
+            "final_capital": 100000,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "calmar": 0.0,
+            "win_rate": 0.0,
+            "total_trades": 0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "avg_bars_held": 0.0,
+            "profit_factor": 0.0,
+            "regime_breakdown": {
+              "open": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "midday": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "close": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              }
+            }
+          },
+          "AAPL": {
+            "total_return": 0.0,
+            "final_capital": 100000,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "calmar": 0.0,
+            "win_rate": 0.0,
+            "total_trades": 0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "avg_bars_held": 0.0,
+            "profit_factor": 0.0,
+            "regime_breakdown": {
+              "open": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "midday": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              },
+              "close": {
+                "sharpe": 0.0,
+                "win_rate": 0.0,
+                "total_trades": 0,
+                "max_drawdown": 0.0
+              }
+            }
+          }
+        },
+        "aggregate": {
+          "sharpe": 0.0,
+          "max_drawdown": 0.0,
+          "win_rate": 0.0,
+          "total_trades": 0,
+          "calmar": 0.0
+        }
+      },
+      "created_at": "2026-05-26T06:46:06.653734",
+      "completed_at": "2026-05-26T06:46:41.218672"
+    },
+    "36ac402f": {
+      "task_id": "36ac402f",
+      "agent": "risk_agent",
+      "action": "validate",
+      "payload": {},
+      "strategy_id": "1b1f4ea2",
+      "status": "failed",
+      "result": {
+        "success": false,
+        "agent": "risk_agent",
+        "reason": "risk check failed: ['sharpe 0.000 < 0.8', 'win rate 0.00% < 45.00%', 'only 0 trades, need 50']",
+        "passed": false,
+        "failures": [
+          "sharpe 0.000 < 0.8",
+          "win rate 0.00% < 45.00%",
+          "only 0 trades, need 50"
+        ],
+        "warnings": [],
+        "thresholds_used": {
+          "min_sharpe": 0.8,
+          "max_drawdown": -0.15,
+          "min_win_rate": 0.45,
+          "min_trades": 50,
+          "max_position_pct": 0.1
+        },
+        "checked_fields": {
+          "sharpe": 0.0,
+          "max_drawdown": 0.0,
+          "win_rate": 0.0,
+          "total_trades": 0
+        },
+        "strategy_id": "1b1f4ea2"
+      },
+      "created_at": "2026-05-26T06:46:41.229211",
+      "completed_at": "2026-05-26T06:46:41.240137"
+    },
+    "5cf7eaeb": {
+      "task_id": "5cf7eaeb",
+      "agent": "backtesting_agent",
+      "action": "run_backtest",
+      "payload": {},
+      "strategy_id": "2b81c559",
+      "status": "done",
+      "result": {
+        "success": true,
+        "agent": "backtesting_agent",
+        "strategy": "qqq_spy_dispersion",
+        "params": {
+          "beta_lookback_min": 60,
+          "zscore_lookback_min": 30,
+          "entry_z": 2.0,
+          "exit_z": 0.3,
+          "stop_atr_mult": 3.0,
+          "active": true
+        },
+        "tickers_tested": [
+          "QQQ"
+        ],
+        "per_ticker": {
+          "QQQ": {
+            "total_return": -0.716538,
+            "final_capital": 28346.71,
+            "sharpe": -44.6512,
+            "max_drawdown": -0.716538,
+            "calmar": -1.0,
+            "win_rate": 0.2208,
+            "total_trades": 9435,
+            "avg_win": 4.67,
+            "avg_loss": -4.07,
+            "avg_bars_held": 1.51,
+            "profit_factor": 1.1479,
+            "regime_breakdown": {
+              "open": {
+                "sharpe": -18.6478,
+                "win_rate": 0.3036,
+                "total_trades": 2065,
+                "max_drawdown": -0.252198
+              },
+              "midday": {
+                "sharpe": -33.983,
+                "win_rate": 0.1853,
+                "total_trades": 3950,
+                "max_drawdown": -0.416073
+              },
+              "close": {
+                "sharpe": -15.8767,
+                "win_rate": 0.2132,
+                "total_trades": 3639,
+                "max_drawdown": -0.384596
+              }
+            }
+          }
+        },
+        "aggregate": {
+          "sharpe": -44.6512,
+          "max_drawdown": -0.716538,
+          "win_rate": 0.2208,
+          "total_trades": 9435,
+          "calmar": -1.0
+        }
+      },
+      "created_at": "2026-05-26T07:14:36.302838",
+      "completed_at": "2026-05-26T07:14:48.917117"
+    },
+    "ea08ba3f": {
+      "task_id": "ea08ba3f",
+      "agent": "risk_agent",
+      "action": "validate",
+      "payload": {},
+      "strategy_id": "2b81c559",
+      "status": "failed",
+      "result": {
+        "success": false,
+        "agent": "risk_agent",
+        "reason": "risk check failed: ['sharpe -44.651 < 0.8', 'max drawdown -71.65% < -15.00%', 'win rate 22.08% < 45.00%']",
+        "passed": false,
+        "failures": [
+          "sharpe -44.651 < 0.8",
+          "max drawdown -71.65% < -15.00%",
+          "win rate 22.08% < 45.00%"
+        ],
+        "warnings": [],
+        "thresholds_used": {
+          "min_sharpe": 0.8,
+          "max_drawdown": -0.15,
+          "min_win_rate": 0.45,
+          "min_trades": 50,
+          "max_position_pct": 0.1
+        },
+        "checked_fields": {
+          "sharpe": -44.6512,
+          "max_drawdown": -0.716538,
+          "win_rate": 0.2208,
+          "total_trades": 9435
+        },
+        "strategy_id": "2b81c559"
+      },
+      "created_at": "2026-05-26T07:14:48.930130",
+      "completed_at": "2026-05-26T07:14:48.946586"
+    }
+  },
+  "model_scores": {
+    "xgboost_AAPL": {
+      "model": "xgboost",
+      "ticker": "AAPL",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "AAPL",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.388565"
+    },
+    "lstm_AAPL": {
+      "model": "lstm",
+      "ticker": "AAPL",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "AAPL",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.391762"
+    },
+    "transformer_AAPL": {
+      "model": "transformer",
+      "ticker": "AAPL",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "AAPL",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.394744"
+    },
+    "xgboost_AMD": {
+      "model": "xgboost",
+      "ticker": "AMD",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "AMD",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.397911"
+    },
+    "lstm_AMD": {
+      "model": "lstm",
+      "ticker": "AMD",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "AMD",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.401160"
+    },
+    "transformer_AMD": {
+      "model": "transformer",
+      "ticker": "AMD",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "AMD",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.405190"
+    },
+    "xgboost_AMZN": {
+      "model": "xgboost",
+      "ticker": "AMZN",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "AMZN",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.409996"
+    },
+    "lstm_AMZN": {
+      "model": "lstm",
+      "ticker": "AMZN",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "AMZN",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.413793"
+    },
+    "transformer_AMZN": {
+      "model": "transformer",
+      "ticker": "AMZN",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "AMZN",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.418119"
+    },
+    "xgboost_CAT": {
+      "model": "xgboost",
+      "ticker": "CAT",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "CAT",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.422245"
+    },
+    "lstm_CAT": {
+      "model": "lstm",
+      "ticker": "CAT",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "CAT",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.426701"
+    },
+    "transformer_CAT": {
+      "model": "transformer",
+      "ticker": "CAT",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "CAT",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.430880"
+    },
+    "xgboost_CHWY": {
+      "model": "xgboost",
+      "ticker": "CHWY",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "CHWY",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.436069"
+    },
+    "lstm_CHWY": {
+      "model": "lstm",
+      "ticker": "CHWY",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "CHWY",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.441341"
+    },
+    "transformer_CHWY": {
+      "model": "transformer",
+      "ticker": "CHWY",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "CHWY",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.446554"
+    },
+    "xgboost_CVNA": {
+      "model": "xgboost",
+      "ticker": "CVNA",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "CVNA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.452383"
+    },
+    "lstm_CVNA": {
+      "model": "lstm",
+      "ticker": "CVNA",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "CVNA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.458151"
+    },
+    "transformer_CVNA": {
+      "model": "transformer",
+      "ticker": "CVNA",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "CVNA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.464834"
+    },
+    "xgboost_GLD": {
+      "model": "xgboost",
+      "ticker": "GLD",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "GLD",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.471597"
+    },
+    "lstm_GLD": {
+      "model": "lstm",
+      "ticker": "GLD",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "GLD",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.478562"
+    },
+    "transformer_GLD": {
+      "model": "transformer",
+      "ticker": "GLD",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "GLD",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.485301"
+    },
+    "xgboost_GOOGL": {
+      "model": "xgboost",
+      "ticker": "GOOGL",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "GOOGL",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.492456"
+    },
+    "lstm_GOOGL": {
+      "model": "lstm",
+      "ticker": "GOOGL",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "GOOGL",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.499459"
+    },
+    "transformer_GOOGL": {
+      "model": "transformer",
+      "ticker": "GOOGL",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "GOOGL",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.505960"
+    },
+    "xgboost_GS": {
+      "model": "xgboost",
+      "ticker": "GS",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "GS",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.512435"
+    },
+    "lstm_GS": {
+      "model": "lstm",
+      "ticker": "GS",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "GS",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.520852"
+    },
+    "transformer_GS": {
+      "model": "transformer",
+      "ticker": "GS",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "GS",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.528729"
+    },
+    "xgboost_JPM": {
+      "model": "xgboost",
+      "ticker": "JPM",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "JPM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.537610"
+    },
+    "lstm_JPM": {
+      "model": "lstm",
+      "ticker": "JPM",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "JPM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.545189"
+    },
+    "transformer_JPM": {
+      "model": "transformer",
+      "ticker": "JPM",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "JPM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.554115"
+    },
+    "xgboost_MSFT": {
+      "model": "xgboost",
+      "ticker": "MSFT",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "MSFT",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.562346"
+    },
+    "lstm_MSFT": {
+      "model": "lstm",
+      "ticker": "MSFT",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "MSFT",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.570817"
+    },
+    "transformer_MSFT": {
+      "model": "transformer",
+      "ticker": "MSFT",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "MSFT",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.579065"
+    },
+    "xgboost_NET": {
+      "model": "xgboost",
+      "ticker": "NET",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "NET",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.587818"
+    },
+    "lstm_NET": {
+      "model": "lstm",
+      "ticker": "NET",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "NET",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.596974"
+    },
+    "transformer_NET": {
+      "model": "transformer",
+      "ticker": "NET",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "NET",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.605804"
+    },
+    "xgboost_NFLX": {
+      "model": "xgboost",
+      "ticker": "NFLX",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "NFLX",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.615629"
+    },
+    "lstm_NFLX": {
+      "model": "lstm",
+      "ticker": "NFLX",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "NFLX",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.625197"
+    },
+    "transformer_NFLX": {
+      "model": "transformer",
+      "ticker": "NFLX",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "NFLX",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.639002"
+    },
+    "xgboost_NVDA": {
+      "model": "xgboost",
+      "ticker": "NVDA",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "NVDA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.649614"
+    },
+    "lstm_NVDA": {
+      "model": "lstm",
+      "ticker": "NVDA",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "NVDA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.659314"
+    },
+    "transformer_NVDA": {
+      "model": "transformer",
+      "ticker": "NVDA",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "NVDA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.670677"
+    },
+    "xgboost_QQQ": {
+      "model": "xgboost",
+      "ticker": "QQQ",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "QQQ",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.680484"
+    },
+    "lstm_QQQ": {
+      "model": "lstm",
+      "ticker": "QQQ",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "QQQ",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.690436"
+    },
+    "transformer_QQQ": {
+      "model": "transformer",
+      "ticker": "QQQ",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "QQQ",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.700830"
+    },
+    "xgboost_SE": {
+      "model": "xgboost",
+      "ticker": "SE",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "SE",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.712747"
+    },
+    "lstm_SE": {
+      "model": "lstm",
+      "ticker": "SE",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "SE",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.725663"
+    },
+    "transformer_SE": {
+      "model": "transformer",
+      "ticker": "SE",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "SE",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.737239"
+    },
+    "xgboost_SPY": {
+      "model": "xgboost",
+      "ticker": "SPY",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "SPY",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.747920"
+    },
+    "lstm_SPY": {
+      "model": "lstm",
+      "ticker": "SPY",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "SPY",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.759695"
+    },
+    "transformer_SPY": {
+      "model": "transformer",
+      "ticker": "SPY",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "SPY",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.771662"
+    },
+    "xgboost_TEM": {
+      "model": "xgboost",
+      "ticker": "TEM",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "TEM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.783716"
+    },
+    "lstm_TEM": {
+      "model": "lstm",
+      "ticker": "TEM",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "TEM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.795822"
+    },
+    "transformer_TEM": {
+      "model": "transformer",
+      "ticker": "TEM",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "TEM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.807509"
+    },
+    "xgboost_TSLA": {
+      "model": "xgboost",
+      "ticker": "TSLA",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "TSLA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.820340"
+    },
+    "lstm_TSLA": {
+      "model": "lstm",
+      "ticker": "TSLA",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "TSLA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.832313"
+    },
+    "transformer_TSLA": {
+      "model": "transformer",
+      "ticker": "TSLA",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "TSLA",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.845308"
+    },
+    "xgboost_TSM": {
+      "model": "xgboost",
+      "ticker": "TSM",
+      "metrics": {
+        "model": "xgboost",
+        "ticker": "TSM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.858538"
+    },
+    "lstm_TSM": {
+      "model": "lstm",
+      "ticker": "TSM",
+      "metrics": {
+        "model": "lstm",
+        "ticker": "TSM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.871408"
+    },
+    "transformer_TSM": {
+      "model": "transformer",
+      "ticker": "TSM",
+      "metrics": {
+        "model": "transformer",
+        "ticker": "TSM",
+        "window_days": 365,
+        "accuracy": 0.54,
+        "sharpe": 1.1,
+        "auc": 0.61
+      },
+      "logged_at": "2026-05-25T21:15:51.884389"
+    }
+  },
+  "trade_log": [],
+  "performance_summary": {}
+}

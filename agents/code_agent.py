@@ -31,7 +31,7 @@ Given the strategy spec below, write a self-contained python module that:
   2. Exposes one function:
         def signals(df: pd.DataFrame, params: dict) -> pd.Series
      where df has columns: open, high, low, close, volume (DatetimeIndex)
-     and returns a series of int {-1, 0, 1} aligned to df.index.
+     and returns a series of int {{-1, 0, 1}} aligned to df.index.
   3. Uses params.get(...) with sensible defaults for every tunable knob.
   4. Has no print statements, no side effects, no global state.
   5. Includes a brief docstring explaining the entry/exit rules.
@@ -86,35 +86,52 @@ class CodeAgent:
 
         self.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         out_path = self.OUTPUT_DIR / f"{strategy_id}_{strategy['name']}.py"
-        out_path.write_text(code_text)
+        out_path.write_text(self._strip_fences(code_text))
 
-        # smoke-test the generated module
-        ok, why = self._validate(out_path)
+        # smoke-test the generated module, then register it for backtest
+        ok, why, signals_fn = self._validate(out_path)
         if not ok:
             return self._failure(f"generated code failed validation: {why}",
+                                 code_path=str(out_path))
+
+        # register the generated function into the runtime STRATEGIES dict
+        # so subsequent backtests can find it by name. orchestrator's
+        # _run_strategy_lifecycle dispatches code_agent BEFORE backtest for
+        # novel strategies, so the next dispatch will hit this registration.
+        from agents.backtesting_agent import register_strategy
+        try:
+            register_strategy(
+                name           = strategy["name"],
+                signal_fn      = signals_fn,
+                default_params = strategy.get("params", {}),
+                overwrite      = True,
+            )
+        except Exception as e:
+            return self._failure(f"register_strategy failed: {e}",
                                  code_path=str(out_path))
 
         from orchestrator import StrategyStatus  # local import — avoid cycle
         self.store.update_strategy(
             strategy_id,
-            status    = StrategyStatus.PAPER_TRADING,
+            status    = StrategyStatus.IMPLEMENTING,
             code_path = str(out_path),
         )
-        return self._success(code_path=str(out_path))
+        return self._success(code_path=str(out_path), registered=True)
 
-    def _validate(self, path: Path) -> tuple[bool, str]:
-        """import the generated module and call signals() on synthetic data."""
+    def _validate(self, path: Path):
+        """import the generated module and call signals() on synthetic data.
+        returns (ok, reason, signals_fn) — signals_fn is None on failure."""
         import importlib.util, numpy as np, pandas as pd
 
-        spec = importlib.util.spec_from_file_location("gen_strategy", path)
+        spec = importlib.util.spec_from_file_location(f"gen_strategy_{path.stem}", path)
         mod  = importlib.util.module_from_spec(spec)
         try:
             spec.loader.exec_module(mod)
         except Exception as e:
-            return False, f"import error: {e}"
+            return False, f"import error: {e}", None
 
         if not hasattr(mod, "signals"):
-            return False, "no signals() function found"
+            return False, "no signals() function found", None
 
         idx = pd.date_range("2024-01-01", periods=500, freq="1min", tz="UTC")
         df  = pd.DataFrame({
@@ -127,10 +144,20 @@ class CodeAgent:
         try:
             sig = mod.signals(df, {})
         except Exception as e:
-            return False, f"signals() raised: {e}"
+            return False, f"signals() raised: {e}", None
         if not isinstance(sig, pd.Series) or len(sig) != len(df):
-            return False, "signals() returned wrong shape/type"
-        return True, "ok"
+            return False, "signals() returned wrong shape/type", None
+        return True, "ok", mod.signals
+
+    @staticmethod
+    def _strip_fences(text: str) -> str:
+        """remove ```python ... ``` markdown fences if the model added them."""
+        t = text.strip()
+        if t.startswith("```"):
+            t = t.split("\n", 1)[1] if "\n" in t else t[3:]
+            if t.rstrip().endswith("```"):
+                t = t.rstrip()[:-3]
+        return t.strip() + "\n"
 
     def _success(self, **kw): return {"success": True, "agent": "code_agent", **kw}
     def _failure(self, reason, **kw):

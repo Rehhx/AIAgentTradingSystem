@@ -61,8 +61,13 @@ class ResearchAgent:
                 system_prompt = RESEARCH_PROMPT,
                 allowed_tools = ["WebSearch", "WebFetch"],
                 model         = "claude-opus-4-7",
+                debug_log_path = "results/research_raw_response.txt",
             )
+            self.log.info(f"research_agent received {len(response)} chars from SDK")
             strategies = self._parse_strategies(response)
+            if not strategies and response:
+                self.log.warning(f"parser found 0 strategies in {len(response)}-char response; "
+                                 f"raw saved to results/research_raw_response.txt")
         except ImportError:
             self.log.warning("claude_agent_sdk not installed — returning empty strategy list")
             strategies = []
@@ -80,16 +85,51 @@ class ResearchAgent:
         return self._success(strategies_found=strategies)
 
     def _parse_strategies(self, response) -> list:
-        """expects the SDK response to contain JSON-formatted strategies."""
+        """
+        try several extraction strategies — model output may wrap the JSON in
+        ```json ... ``` fences, embed it in prose, or include multiple arrays.
+        """
         import json, re
         text = response if isinstance(response, str) else str(response)
-        match = re.search(r"\[.*\]", text, re.DOTALL)
-        if not match:
+        if not text.strip():
             return []
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError:
-            return []
+
+        # 1. fenced ```json ... ``` block
+        fenced = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", text, re.DOTALL)
+        if fenced:
+            try:
+                return json.loads(fenced.group(1))
+            except json.JSONDecodeError:
+                pass
+
+        # 2. greedy outer brackets — for cases where the array is the entire body
+        greedy = re.search(r"\[\s*\{.*\}\s*\]", text, re.DOTALL)
+        if greedy:
+            try:
+                return json.loads(greedy.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        # 3. try to find an array by walking forward from each '['
+        for i, ch in enumerate(text):
+            if ch != "[":
+                continue
+            depth = 0
+            for j in range(i, len(text)):
+                if text[j] == "[":
+                    depth += 1
+                elif text[j] == "]":
+                    depth -= 1
+                    if depth == 0:
+                        candidate = text[i:j + 1]
+                        try:
+                            parsed = json.loads(candidate)
+                            if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+                                return parsed
+                        except json.JSONDecodeError:
+                            pass
+                        break
+        return []
 
     def _success(self, **kw): return {"success": True, "agent": "research_agent", **kw}
     def _failure(self, reason, **kw):

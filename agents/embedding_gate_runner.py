@@ -52,7 +52,7 @@ def main(ticker: str, strategy_name: str):
     if strategy_name not in STRATEGIES:
         raise SystemExit(f"unknown strategy: {strategy_name}")
 
-    fn, default_params = STRATEGIES[strategy_name]
+    fn, default_params = STRATEGIES[strategy_name][0], STRATEGIES[strategy_name][1]
     stop_mult = default_params.get("stop_atr_mult", ATR_STOP_MULT)
     allowed   = STRATEGY_REGIME_AFFINITY.get(strategy_name)
 

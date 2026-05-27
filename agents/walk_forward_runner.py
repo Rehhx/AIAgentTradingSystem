@@ -41,7 +41,8 @@ GRIDS = {
 def main():
     out = []
     for name, grid in GRIDS.items():
-        _, default_params = STRATEGIES.get(name, (None, {}))
+        entry = STRATEGIES.get(name)
+        default_params = entry[1] if entry else {}
         if not default_params.get("active", True):
             print(f"skipping {name} (inactive)")
             continue

@@ -34,6 +34,7 @@ from agents.risk_agent         import RiskAgent         as _RealRiskAgent
 from agents.code_agent         import CodeAgent         as _RealCodeAgent
 from agents.monitor_agent      import MonitorAgent      as _RealMonitorAgent
 from agents.execution_agent    import ExecutionAgent    as _RealExecutionAgent
+from agents.options_agent      import OptionsAgent      as _RealOptionsAgent
 from config                    import DEFAULT_TICKERS
 
 # ---------------------------------------------------------------------------
@@ -62,6 +63,7 @@ class AgentName(str, Enum):
     CODE           = "code_agent"
     MONITOR        = "monitor_agent"
     EXECUTION      = "execution_agent"
+    OPTIONS        = "options_agent"
 
 
 class StrategyStatus(str, Enum):
@@ -372,6 +374,16 @@ class ExecutionAgent(BaseAgent):
         return self._impl.run(task)
 
 
+class OptionsAgent(BaseAgent):
+    """delegates to agents.options_agent.OptionsAgent (alpaca options paper trading)."""
+    def __init__(self, store):
+        super().__init__(AgentName.OPTIONS, store)
+        self._impl = _RealOptionsAgent(store=store)
+
+    def run(self, task: dict) -> dict:
+        return self._impl.run(task)
+
+
 # ---------------------------------------------------------------------------
 # orchestrator
 # ---------------------------------------------------------------------------
@@ -384,6 +396,13 @@ class Orchestrator:
     def __init__(self, data_dir: str = r"C:\Users\pcagm\Downloads\StockData"):
         self.store    = ResultsStore()
         self.data_dir = Path(data_dir)
+
+        # re-register any generated strategies sitting in strategies/ so the
+        # registry survives restarts. built-in strategies are already present
+        # at module load time; this picks up anything code_agent wrote.
+        from agents.backtesting_agent import load_generated_strategies
+        load_generated_strategies()
+
         self.agents: dict[AgentName, BaseAgent] = {
             AgentName.RESEARCH:    ResearchAgent(self.store),
             AgentName.AUTONOMOUS:  AutonomousAgent(self.store),
@@ -393,6 +412,7 @@ class Orchestrator:
             AgentName.CODE:        CodeAgent(self.store),
             AgentName.MONITOR:     MonitorAgent(self.store),
             AgentName.EXECUTION:   ExecutionAgent(self.store),
+            AgentName.OPTIONS:     OptionsAgent(self.store),
         }
         log.info(f"orchestrator initialized | data_dir={self.data_dir} | agents={len(self.agents)}")
 
@@ -454,7 +474,15 @@ class Orchestrator:
         return approved_ids
 
     def _run_strategy_lifecycle(self, idea: dict) -> Optional[str]:
-        """runs a single idea through backtest → risk → code → paper"""
+        """
+        runs a single idea through (code → if needed) → backtest → risk → paper.
+
+        novel ideas (no signal function in STRATEGIES yet) go to code_agent
+        first so a python implementation exists before backtest. ideas whose
+        name matches an existing registry entry skip code generation and go
+        straight to backtest.
+        """
+        from agents.backtesting_agent import is_registered  # local — runtime lookup
 
         # register strategy
         strategy = new_strategy(
@@ -465,6 +493,18 @@ class Orchestrator:
         )
         sid = self.store.add_strategy(strategy)
         log.info(f"strategy registered | id={sid} name={strategy['name']}")
+
+        # code generation FIRST for novel ideas — code_agent writes a signals()
+        # function, validates it on synthetic data, and registers it into the
+        # runtime STRATEGIES dict so the backtest dispatch below can find it.
+        if not is_registered(strategy["name"]):
+            log.info(f"strategy '{strategy['name']}' not in registry — dispatching code_agent first")
+            self.store.update_strategy(sid, status=StrategyStatus.IMPLEMENTING)
+            code_result = self.dispatch(AgentName.CODE, "implement", {}, sid)
+            if not code_result.get("success"):
+                log.warning(f"code generation failed | id={sid}")
+                self.store.update_strategy(sid, status=StrategyStatus.REJECTED)
+                return None
 
         # backtest
         self.store.update_strategy(sid, status=StrategyStatus.BACKTESTING)
@@ -481,13 +521,8 @@ class Orchestrator:
             log.warning(f"risk check failed | id={sid}")
             return None
 
-        # code generation
-        self.store.update_strategy(sid, status=StrategyStatus.IMPLEMENTING)
-        code_result = self.dispatch(AgentName.CODE, "implement", {}, sid)
-        if not code_result.get("success"):
-            log.warning(f"code generation failed | id={sid}")
-            return None
-
+        # at this point risk_agent has set status to APPROVED. mark paper.
+        self.store.update_strategy(sid, status=StrategyStatus.PAPER_TRADING)
         log.info(f"strategy approved and ready for paper trading | id={sid}")
         return sid
 
