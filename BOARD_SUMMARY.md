@@ -113,4 +113,25 @@ The full menu (all on quality-10, $100k, adjusted data) — pick by risk appetit
 - **Lowest risk:** `defensive` cuts drawdown to ~−8%.
 - *Caveat on the cross-sectional sleeve:* top-3 of 10 names is concentrated and rotates more; the dual-momentum market filter is what keeps its drawdown in check. It behaves better on a larger universe.
 
+---
+
+## 8. Expected lean years — the honest expectation
+
+This is a **long-biased equity** book. It compounds strongly in trending markets but will have **flat / low-return years in choppy, sideways, or V-shaped-crash markets**. In the backtest, **2018–2020 returned only ~+2%/yr** (vs the ~16% long-run average) — driven by the Q4-2018 selloff and a choppy, directionless 2019 (the COVID crash came right after, in **early 2020**). **The 15–20% target is a multi-year average, not a per-year guarantee.** A 2018-style year *will* recur.
+
+**This is structural, not a bug we can tune away.** We explicitly tried three fixes for the lean stretch and **none robustly helped** (each improved one slice of history while hurting another — i.e. overfitting):
+
+| Attempted fix | Result |
+|---|---|
+| Capitulation dip-buyer (buys crash bottoms) | Caught the V-recoveries no better than standard RSI-2; low return |
+| Anti-whipsaw band on the trend/market filters | Non-monotonic / band-sensitive; slightly *worse* in the portfolio |
+| Market-neutral long/short (uncorrelated factor) | Genuinely market-neutral (beta ≈ 0) but ~zero net edge after costs, −33% momentum-crash DD |
+
+### How we get *some* return in those flat years (open work)
+1. **Earn yield on idle cash.** In defensive/flat regimes the book sits largely in cash — parking that in a **T-bill ETF (e.g. BIL / SGOV)** earns ~4–5%/yr at current rates instead of 0%. Low-risk, concrete, and worth wiring as the default "cash" holding. *(Not yet implemented.)*
+2. **Let the allocator keep hunting.** `portfolio_allocator.py` auto-admits any *new* strategy that passes the Sharpe + walk-forward gate (and auto-rejects the rest, as it did with all three fixes above). A genuinely uncorrelated edge discovered later joins automatically.
+3. **Plan for it operationally.** Hold a cash reserve and set the expectation with stakeholders up front: a long-biased strategy has lean years, and the disciplined response is to *not* curve-fit a fix that blows up live.
+
+**Bottom line:** the system is strong and honest — ~16% CAGR, Sharpe ~1.4, −13% drawdown, positive in 5/5 walk-forward folds — but it is not immune to flat markets, and we will not pretend otherwise. Earning a steadier return *through* flat years (cash yield + new uncorrelated edge) is the main open item.
+
 *What changed the outcome: we stopped fighting transaction costs on 1-minute bars and moved to a holding period where our edge survives them.*

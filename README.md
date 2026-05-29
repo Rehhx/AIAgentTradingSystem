@@ -39,16 +39,21 @@ passes the risk gate and walk-forward, combined and volatility-targeted:
 | 50/200 trend | 10 quality names | long-term trend |
 | Cross-sectional dual-momentum | **full S&P 500** | hold top-10 relative-strength names; cash in bear markets |
 
-Combined and scaled to a 12% annualized volatility target:
+Combined with **risk-parity** weights and scaled to a volatility target:
 
 | Deploy book | Sharpe | $ PnL / $100k | CAGR | Max DD | Risk gate | Walk-forward |
 |---|---|---|---|---|---|---|
-| **ensemble + vol-target** | **1.44** | **+$308,115** | **14.5%** | **−12.7%** | ✅ PASS | ✅ 5/5 folds, OOS +2.21 |
+| **`portfolio`** (risk-parity, 16% vol, 1.6× cap) ⭐ | 1.39 | **+$377,877** | **16.3%** | **−13.0%** | ✅ PASS | ✅ 5/5 folds |
+| `blended_plus` (equal-weight, 12% vol, no leverage) | **1.44** | +$308,115 | 14.5% | −12.7% | ✅ PASS | ✅ 5/5 folds |
 
 Backtest: 2016–2026, adjusted daily data, 6 bps round-trip, ~398 round-trip
-trades/year. **Positive in all 5 contiguous walk-forward folds**, including the
-2022 bear. Full numbers in [BOARD_SUMMARY.md](BOARD_SUMMARY.md);
-per-strategy walk-forward in [WALK_FORWARD_SETTINGS.md](WALK_FORWARD_SETTINGS.md).
+trades/year. **Positive in all 5 contiguous walk-forward folds.** `portfolio` is
+the 15–20% target book (uses conditional leverage); `blended_plus` is the
+no-leverage floor. New strategies are auto-screened by
+[`runners/portfolio_allocator.py`](runners/portfolio_allocator.py) — only those
+passing Sharpe + walk-forward join. Full numbers in
+[BOARD_SUMMARY.md](BOARD_SUMMARY.md); per-strategy walk-forward in
+[WALK_FORWARD_SETTINGS.md](WALK_FORWARD_SETTINGS.md).
 
 > **Honest caveats:** long-only equity book validated over a 2016–2026 bull
 > market — it is not market-neutral. Vol-targeting controls drawdown and the
@@ -74,19 +79,29 @@ python runners\deploy_check.py
 
 ### Paper-trade it (dry-run first, then --live)
 ```powershell
-# dry-run prints the exact order plan; --live submits to Alpaca paper
-python runners\daily_rebalance.py --book blended_plus --xs-universe sp500 --vol-target 0.12
+# RECOMMENDED 15-20% book: risk-parity portfolio, vol-targeted (16% vol, 1.6x in calm)
+python runners\daily_rebalance.py --book portfolio --xs-universe sp500 --vol-target 0.16 --max-leverage 1.6           # dry-run (prints orders)
+python runners\daily_rebalance.py --book portfolio --xs-universe sp500 --vol-target 0.16 --max-leverage 1.6 --live    # submit to Alpaca paper
+
+# conservative, NO leverage (the floor):
 python runners\daily_rebalance.py --book blended_plus --xs-universe sp500 --vol-target 0.12 --live
 ```
-Run once per day. Orders are fractional (dollar-sized) with a $250 no-trade band.
+Run it **once per trading day, before the 6:30 AM PST open** (it decides off the
+prior close and fills at the open). Orders are fractional (dollar-sized) with a
+$250 no-trade band.
 
 ### Book menu (pick by risk appetite)
-| Book | Sharpe | CAGR | Max DD |
-|---|---|---|---|
-| `blended_plus` + full-500 xs + vol-target (deploy) | 1.44 | 14.5% | −12.7% |
-| `trend_5020 --vol-target 0.12` | 1.36 | 13.7% | −12.7% |
-| `blended` (RSI-2 + Donchian + trend) | 1.32 | 10.4% | −13.4% |
-| `defensive` (+ turn-of-month, lowest risk) | 1.22 | 8.3% | −8.3% |
+| Book | Sharpe | CAGR | Max DD | Notes |
+|---|---|---|---|---|
+| **`portfolio`** (risk-parity + vol-target 16%/1.6×) | 1.39 | 16.3% | −13.0% | 15–20% target book |
+| `blended_plus` + full-500 xs + vol-target | 1.44 | 14.5% | −12.7% | no leverage |
+| `regime_adaptive --max-leverage 1.5` | 1.41 | 20.8% | −18.4% | aggressive growth (paper) |
+| `trend_5020 --vol-target 0.12` | 1.36 | 13.7% | −12.7% | single sleeve |
+| `defensive` (+ turn-of-month) | 1.22 | 8.3% | −8.3% | lowest risk |
+
+> **Lean years:** this is a long-biased book — it has flat years in choppy/sideways
+> markets (2018–2020 ≈ +2%/yr). 15–20% is a multi-year *average*, not a yearly
+> guarantee. See [BOARD_SUMMARY.md](BOARD_SUMMARY.md) §8.
 
 ---
 

@@ -217,6 +217,18 @@ def sig_zscore_revert(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
     return _state_machine(enter, exit_, c.index)
 
 
+def sig_trend_band(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
+    """50/200 trend with an ANTI-WHIPSAW band: go long only when the fast MA is
+    `band` above the slow MA, and exit only when it's `band` below — holding
+    through small crosses. Reduces the buy-high/sell-low chop of a bare SMA cross
+    in V-shaped markets (Q4-2018, COVID)."""
+    p = params or {}
+    fast, slow, band = p.get("fast", 50), p.get("slow", 200), p.get("band", 0.03)
+    c = d["close"]
+    f, s = c.rolling(fast).mean(), c.rolling(slow).mean()
+    return _state_machine(f > s * (1 + band), f < s * (1 - band), c.index)
+
+
 def sig_abs_momentum(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
     """Absolute (time-series) momentum: hold long while trailing N-day return is
     positive. Slower, longer-horizon trend than the 50/200 SMA cross."""
@@ -228,10 +240,30 @@ def sig_abs_momentum(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
     return (mom > thr).astype(float)
 
 
+def sig_capitulation(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
+    """Capitulation dip-buyer: buys EXTREME oversold WITHOUT a trend filter, so
+    it can catch crash bottoms (Dec-2018, Mar-2020) that trend-gated RSI-2 sits
+    out. Optional drop confirmation (price well below a recent high) keeps it to
+    genuine washouts, not every wobble. Exits into the bounce."""
+    p = params or {}
+    entry_rsi = p.get("entry_rsi", 5)        # extreme oversold
+    exit_rsi  = p.get("exit_rsi", 55)
+    drop_pct  = p.get("drop_pct", 0.07)      # require >=7% below the recent high
+    high_lb   = p.get("high_lb", 10)
+    c = d["close"]
+    r = _rsi(c, p.get("rsi_period", 2))
+    enter = (r < entry_rsi)
+    if drop_pct > 0:
+        enter = enter & (c < c.rolling(high_lb).max() * (1 - drop_pct))
+    exit_ = r > exit_rsi
+    return _state_machine(enter, exit_, c.index)
+
+
 CANDIDATE_STRATEGIES = {
     "turn_of_month": sig_turn_of_month,
     "zscore_revert": sig_zscore_revert,
     "abs_momentum":  sig_abs_momentum,
+    "capitulation":  sig_capitulation,
 }
 
 
@@ -272,7 +304,8 @@ def _xs_trades(W: pd.DataFrame, panel: pd.DataFrame) -> list:
 def backtest_cross_sectional(universe=None, mode: str = "momentum",
                              lookback: int = 126, skip: int = 21, k: int = 3,
                              market_filter: bool = False, market_ticker: str = "SPY",
-                             market_sma: int = 200, label: str | None = None) -> dict:
+                             market_sma: int = 200, market_band: float = 0.0,
+                             label: str | None = None) -> dict:
     """equal-weight long-only cross-sectional book over the universe, $100k base.
 
     market_filter=True turns this into DUAL MOMENTUM: hold the top-k by relative
@@ -307,7 +340,14 @@ def backtest_cross_sectional(universe=None, mode: str = "momentum",
     if market_filter:                                         # dual-momentum gate
         try:
             mkt = daily_bars(market_ticker)["close"]
-            above = (mkt > mkt.rolling(market_sma).mean()).reindex(W.index).ffill().fillna(False)
+            sma = mkt.rolling(market_sma).mean()
+            if market_band > 0:                               # anti-whipsaw hysteresis
+                ratio = mkt / sma
+                above = _state_machine(ratio > (1 + market_band),
+                                       ratio < (1 - market_band), mkt.index).astype(bool)
+            else:
+                above = (mkt > sma)
+            above = above.reindex(W.index).ffill().fillna(False)
             W = W.mul(above.astype(float), axis=0)            # cash when market < SMA
         except Exception:
             pass
@@ -488,6 +528,58 @@ def backtest_blended(universe=None, params: dict | None = None,
 # ---------------------------------------------------------------------------
 # walk-forward: sequential contiguous folds (shows regime stability, not 1 split)
 # ---------------------------------------------------------------------------
+
+def backtest_long_short(universe=None, mode: str = "momentum", lookback: int = 252,
+                        skip: int = 21, k: int = 50, borrow_annual: float = 0.02,
+                        label: str | None = None) -> dict:
+    """DOLLAR-NEUTRAL long/short book: each day go +50% long the top-k by signal
+    and -50% short the bottom-k (net beta ~0), $100k base. Profits from the
+    winner-minus-loser SPREAD regardless of market direction — a genuinely
+    uncorrelated stream. Charges 6bps on turnover + a borrow cost on the short leg.
+      mode="momentum": long winners / short losers (12-1 momentum factor)
+      mode="reversal": long recent losers / short recent winners (short-term reversal)"""
+    universe = universe or QUALITY_UNIVERSE
+    closes = {}
+    for t in universe:
+        try:
+            closes[t] = daily_bars(t)["close"]
+        except Exception:
+            continue
+    panel = pd.concat(closes, axis=1); panel.columns = list(closes)
+    rets = panel.pct_change()
+    if mode == "reversal":
+        score = -(panel / panel.shift(lookback) - 1)
+    else:
+        score = panel.shift(skip) / panel.shift(skip + lookback) - 1
+
+    cols = list(panel.columns)
+    W = pd.DataFrame(0.0, index=panel.index, columns=cols)
+    for i in range(len(panel.index)):
+        row = score.iloc[i].dropna()
+        if len(row) < 2 * k:
+            continue
+        longs = row.nlargest(k).index
+        shorts = row.nsmallest(k).index
+        W.iloc[i, [cols.index(t) for t in longs]] = 0.5 / k
+        W.iloc[i, [cols.index(t) for t in shorts]] = -0.5 / k
+    W = W.shift(1).fillna(0.0)
+
+    gross = (W * rets).sum(axis=1)
+    turnover = W.diff().abs().sum(axis=1).fillna(W.abs().sum(axis=1))
+    borrow = W.clip(upper=0).abs().sum(axis=1) * (borrow_annual / TRADING_DAYS)
+    port = gross - turnover * SIDE_COST - borrow
+    m = _metrics_from_returns(port, [], label or f"ls_{mode}")
+    # market exposure: beta + correlation to SPY (the value of neutrality)
+    try:
+        spy = daily_bars("SPY")["close"].pct_change().reindex(port.index).fillna(0.0)
+        v = spy.var()
+        m["beta_to_spy"] = round(float((port.cov(spy) / v) if v else 0.0), 3)
+        m["corr_to_spy"] = round(float(port.corr(spy)), 3)
+    except Exception:
+        pass
+    m["mode"], m["k"] = mode, k
+    return m
+
 
 def vol_target(returns: pd.Series, target_vol: float = 0.12, window: int = 20,
                max_leverage: float = 1.0) -> pd.Series:
