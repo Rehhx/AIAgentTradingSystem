@@ -321,12 +321,21 @@ def main():
         return
 
     print("Submitting orders...")
+    # cancel any stale/pending open orders first so a re-run never double-submits
+    if not agent.simulated and agent.client is not None:
+        try:
+            canceled = agent.client.cancel_orders()
+            if canceled:
+                print(f"  (canceled {len(canceled)} stale open order(s) first)")
+        except Exception as e:
+            print(f"  [warn] could not cancel open orders: {e}")
     for o in orders:
         res = agent.run({"payload": {"signal": {**o, "order_type": "market",
                                                 "time_in_force": "day"}},
                          "strategy_id": f"daily_{args.book}"})
         status = res.get("fill", {}).get("status", res.get("reason"))
-        print(f"  {o['side'].upper():4s} {o['qty']:>5d} {o['ticker']:6s} -> {status}")
+        amt = f"{o['qty']:>7g} sh" if "qty" in o else f"${o['notional']:>8,.0f}"
+        print(f"  {o['side'].upper():4s} {amt} {o['ticker']:6s} -> {status}")
 
 
 if __name__ == "__main__":
