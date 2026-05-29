@@ -317,6 +317,62 @@ def sig_pead(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
     return pd.Series(pos, index=c.index, dtype=float)
 
 
+def sig_high_momentum(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
+    """52-week-high momentum (George & Hwang 2004): stocks trading near their
+    52-week high keep outperforming. Long when close is within `near_pct` of the
+    `lookback`-day high AND above the 200-day trend; exit when it falls `exit_pct`
+    below that rolling high. Distinct from Donchian (longer lookback + a
+    proximity band + trend filter, not a strict new-high breakout). Long/flat."""
+    p = params or {}
+    look = int(p.get("lookback", 252))
+    near = p.get("near_pct", 0.05)         # within 5% of the high to enter
+    ex   = p.get("exit_pct", 0.15)         # exit once 15% off the high
+    trend_sma = int(p.get("trend_sma", 200))
+    c = d["close"]
+    hi = c.rolling(look, min_periods=look // 2).max()
+    above_trend = c > c.rolling(trend_sma, min_periods=trend_sma // 2).mean()
+    enter = (c >= hi * (1 - near)) & above_trend
+    exit_ = c < hi * (1 - ex)
+    return _state_machine(enter.fillna(False), exit_.fillna(False), c.index)
+
+
+def sig_bollinger_revert(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
+    """Bollinger-band mean reversion: in an uptrend, buy when close pierces the
+    lower band (SMA - k*sigma) and exit when it reverts to the middle band (SMA).
+    The trend filter avoids catching falling knives. Distinct from RSI-2 (uses
+    price distance measured in sigmas, not an RSI oscillator). Long/flat."""
+    p = params or {}
+    n = int(p.get("window", 20))
+    k = p.get("num_std", 2.0)
+    trend_sma = int(p.get("trend_sma", 200))
+    c = d["close"]
+    mid = c.rolling(n, min_periods=n // 2).mean()
+    sd  = c.rolling(n, min_periods=n // 2).std()
+    lower = mid - k * sd
+    above_trend = c > c.rolling(trend_sma, min_periods=trend_sma // 2).mean()
+    enter = (c < lower) & above_trend
+    exit_ = c >= mid
+    return _state_machine(enter.fillna(False), exit_.fillna(False), c.index)
+
+
+def sig_ma_pullback(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
+    """Buy-the-dip in a confirmed uptrend: when 50d > 200d, enter on a pullback
+    to/below the `pull_sma`-day average; exit when price closes `target_pct`
+    above that average (the bounce) or the uptrend breaks. Distinct from RSI-2
+    (distance to a moving average rather than an oscillator). Long/flat."""
+    p = params or {}
+    pull = int(p.get("pull_sma", 20))
+    fast, slow = int(p.get("fast", 50)), int(p.get("slow", 200))
+    target = p.get("target_pct", 0.03)
+    c = d["close"]
+    ma = c.rolling(pull, min_periods=pull // 2).mean()
+    uptrend = (c.rolling(fast, min_periods=fast // 2).mean()
+               > c.rolling(slow, min_periods=slow // 2).mean())
+    enter = (c <= ma) & uptrend
+    exit_ = (c >= ma * (1 + target)) | (~uptrend)
+    return _state_machine(enter.fillna(False), exit_.fillna(False), c.index)
+
+
 CANDIDATE_STRATEGIES = {
     "turn_of_month": sig_turn_of_month,
     "zscore_revert": sig_zscore_revert,
@@ -325,6 +381,9 @@ CANDIDATE_STRATEGIES = {
     "pead":          sig_pead,
     "trend_multi":   sig_trend_multi,
     "recovery":      sig_recovery,
+    "high_momentum":     sig_high_momentum,
+    "bollinger_revert":  sig_bollinger_revert,
+    "ma_pullback":       sig_ma_pullback,
 }
 
 

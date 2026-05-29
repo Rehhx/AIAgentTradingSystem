@@ -49,6 +49,13 @@ Residual risk: an unprecedented one-day gap hurts ~1.8× as much.
 | capitulation | buy extreme oversold (no trend filter) | `entry_rsi=5, exit_rsi=55, drop_pct=0.07` | rejected (no edge) |
 | cross-sectional reversal | buy biggest losers | `lookback=3-5, k=30` | rejected (−35% DD) |
 | managed-futures (proxy) | long/short TS-momentum across asset ETFs | 12-mo sign, inverse-vol | rejected (dilutive); see MANAGED_FUTURES_PROPOSAL.md |
+| high_momentum | 52-week-high proximity momentum (George-Hwang) | `lookback=252, near_pct=0.05, exit_pct=0.15` | rejected: Sharpe 1.05 but DD −15.0% + slightly *hurts* book (overlaps trend/xs) |
+| bollinger_revert | buy lower Bollinger band in uptrend, exit mid-band | `window=20, num_std=2, trend_sma=200` | rejected: Sharpe 0.60 (overlaps RSI-2) |
+| ma_pullback | buy pullback to 20-day MA in a 50/200 uptrend | `pull_sma=20, fast=50, slow=200, target_pct=0.03` | rejected: DD −20.8% (overlaps RSI-2) |
+
+*Finding: the long/flat equity-factor space on these names is **saturated** — every new
+price-pattern sleeve overlaps the six deployed ones and adds only noise. Genuine
+diversification now requires a different return SOURCE (e.g. the options vol-risk-premium below).*
 
 ---
 
@@ -92,6 +99,30 @@ Residual risk: an unprecedented one-day gap hurts ~1.8× as much.
 - **Per-ticker sleeves** (rsi2, donchian, trend, recovery): quality-10 = SPY, QQQ, GLD, MSFT, AAPL, GOOGL, AMZN, JPM, UNH, XOM.
 - **Cross-sectional sleeves** (xs_dualmom, pead): full S&P 500 (`--xs-universe sp500`).
 - Data: split/dividend-adjusted daily bars (yfinance); `DAILY_USE_ADJUSTED=0` forces raw parquet.
+
+## Options income sleeves (no leverage) — `runners/options_income.py`
+Harvest the **volatility risk premium** (option buyers overpay for insurance: implied
+vol > realized vol). A *different return source* from the price-pattern sleeves —
+which is why they add value where new equity sleeves don't. Both fully collateralized
+(no leverage, no naked short risk). 1-month cycles on SPY+QQQ.
+
+| Sleeve | Mechanism | CAGR / vol / Sharpe / DD | Notes |
+|---|---|---|---|
+| **putwrite** | sell 2% OTM cash-secured put monthly | 9.2% / 7.2% / 1.26 / −11.1% | defensive income; ~half SPY's vol & DD; corr 0.76 |
+| **buywrite** | own SPY/QQQ, sell 2% OTM call monthly | 16.9% / 11.5% / 1.43 / −16.8% | smoother equity; corr 0.90 |
+
+> **MODELED, not a fill backtest.** No historical option chains available → premiums
+> are Black-Scholes with IV = realized vol + a **volatility-risk-premium markup** (`--vrp`,
+> default 3 vol points, empirically ~what SPX IV−RV has averaged). Sensitivity at 0pt
+> markup: PutWrite Sharpe 0.80, BuyWrite 1.11 — i.e. the edge scales with that one
+> assumption, shown in full in the runner's output. **Validate live on Alpaca paper**
+> (`agents/options_agent.py`) before any real capital. Not yet wired to the live book.
+>
+> **Best fit:** the put-write is an upgrade path for the *idle-cash → BIL* overlay
+> (earn ~9% on defensive collateral vs ~4% T-bills), still no leverage.
+
+Run: `python runners\options_income.py --kind putwrite --tickers SPY QQQ`
+(or `--kind buywrite`; `--vrp 0.02..0.04` to stress the premium assumption).
 
 ## Honest caveats
 Long-biased equity book, validated 2016–2026 (one decade, one out-of-sample window).

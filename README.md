@@ -29,8 +29,8 @@ Regenerate its data after a change with `python runners/build_dashboard_data.py`
 
 ## The deployable strategy
 
-A diversified **ensemble** of four mechanisms, each of which independently
-passes the risk gate and walk-forward, combined and volatility-targeted:
+A diversified **ensemble of six mechanisms**, each independently screened against
+the risk gate and walk-forward, combined by weight and volatility-targeted:
 
 | Component | Universe | Role |
 |---|---|---|
@@ -38,28 +38,41 @@ passes the risk gate and walk-forward, combined and volatility-targeted:
 | Donchian breakout (20/10) | 10 quality names | ride breakouts |
 | 50/200 trend | 10 quality names | long-term trend |
 | Cross-sectional dual-momentum | **full S&P 500** | hold top-10 relative-strength names; cash in bear markets |
+| Recovery-thrust | 10 quality names | catch bull-run snapbacks off the 200-day (lean-year capture) |
+| PEAD (post-earnings drift) | **full S&P 500** | hold gap-up earnings beats through the drift |
 
-Combined with **risk-parity** weights and scaled to a volatility target:
+Three overlays on top: **vol-targeting** (17%, ≤1.8× conditional leverage),
+**idle cash → BIL T-bills**, and an **early-warning de-risk** (cut to 60% when
+SPY < 50-day and vol spikes, ahead of the lagging 200-day bear signal).
 
 | Deploy book | Sharpe | $ PnL / $100k | CAGR | Max DD | Risk gate | Walk-forward |
 |---|---|---|---|---|---|---|
-| **`portfolio`** (risk-parity, 16% vol, 1.6× cap) ⭐ | 1.39 | **+$377,877** | **16.3%** | **−13.0%** | ✅ PASS | ✅ 5/5 folds |
-| `blended_plus` (equal-weight, 12% vol, no leverage) | **1.44** | +$308,115 | 14.5% | −12.7% | ✅ PASS | ✅ 5/5 folds |
+| **`portfolio_full`** (6 sleeves, vol-target 17%, 1.8× cap) ⭐ | **1.46** | **+$469,050** | **18.2%** | **−13.1%** | ✅ PASS | ✅ 5/5 folds |
+| `blended_plus` (equal-weight, no leverage) | 1.44 | +$308,115 | 14.5% | −12.7% | ✅ PASS | ✅ 5/5 folds |
 
-Backtest: 2016–2026, adjusted daily data, 6 bps round-trip, ~398 round-trip
-trades/year. **Positive in all 5 contiguous walk-forward folds.** `portfolio` is
-the 15–20% target book (uses conditional leverage); `blended_plus` is the
+Backtest: 2016–2026, adjusted daily data, 6 bps round-trip, well above the desk's
+100-trades/year floor. **Positive in all 5 contiguous walk-forward folds**
+(in-sample Sharpe 1.08 → out-of-sample 2.33; lean 2018–2020 ≈ +9%). `portfolio_full`
+is the deployed 15–20% target book (conditional leverage); `blended_plus` is the
 no-leverage floor. New strategies are auto-screened by
 [`runners/portfolio_allocator.py`](runners/portfolio_allocator.py) — only those
-passing Sharpe + walk-forward join. Full numbers in
-[BOARD_SUMMARY.md](BOARD_SUMMARY.md); per-strategy walk-forward in
-[WALK_FORWARD_SETTINGS.md](WALK_FORWARD_SETTINGS.md).
+passing Sharpe + walk-forward join. **Complete strategy reference (every sleeve,
+overlay & parameter) in [STRATEGIES.md](STRATEGIES.md)**; full numbers in
+[BOARD_SUMMARY.md](BOARD_SUMMARY.md).
+
+**Also researched (no-leverage, not deployed):** options *income* sleeves that
+harvest the volatility risk premium — a cash-secured **put-write** (modeled
+Sharpe 1.26, −11% DD, beats the market in every down/flat year) and a covered
+**call/buy-write** (Sharpe 1.43). Premiums are *modeled* (Black-Scholes + a
+documented IV-vs-realized markup), pending live paper validation — see
+[STRATEGIES.md](STRATEGIES.md) and `runners/options_income.py`.
 
 > **Honest caveats:** long-only equity book validated over a 2016–2026 bull
 > market — it is not market-neutral. Vol-targeting controls drawdown and the
-> walk-forward through 2022 is real evidence of resilience, but it should be
-> paper-traded live for several weeks before any real capital. The cross-sectional
-> sleeve currently concentrates in the dominant momentum theme (semis/AI).
+> walk-forward through the 2022 bear is real evidence of resilience, but it should
+> be paper-traded live for several weeks before any real capital. The 1.8× cap is
+> *conditional* leverage (only in calm markets; de-risks when vol spikes). The
+> cross-sectional sleeve can concentrate in the dominant momentum theme (semis/AI).
 
 ---
 
@@ -79,29 +92,29 @@ python runners\deploy_check.py
 
 ### Paper-trade it (dry-run first, then --live)
 ```powershell
-# RECOMMENDED 15-20% book: risk-parity portfolio, vol-targeted (16% vol, 1.6x in calm)
-python runners\daily_rebalance.py --book portfolio --xs-universe sp500 --vol-target 0.16 --max-leverage 1.6           # dry-run (prints orders)
-python runners\daily_rebalance.py --book portfolio --xs-universe sp500 --vol-target 0.16 --max-leverage 1.6 --live    # submit to Alpaca paper
+# DEPLOYED book: 6-sleeve portfolio_full, vol-targeted (17% vol, up to 1.8x in calm)
+python runners\daily_rebalance.py --book portfolio_full --xs-universe sp500 --vol-target 0.17 --max-leverage 1.8           # dry-run (prints orders)
+python runners\daily_rebalance.py --book portfolio_full --xs-universe sp500 --vol-target 0.17 --max-leverage 1.8 --live    # submit to Alpaca paper
 
 # conservative, NO leverage (the floor):
 python runners\daily_rebalance.py --book blended_plus --xs-universe sp500 --vol-target 0.12 --live
 ```
 Run it **once per trading day, before the 6:30 AM PST open** (it decides off the
 prior close and fills at the open). Orders are fractional (dollar-sized) with a
-$250 no-trade band.
+$250 no-trade band. `run_rebalance.ps1` wraps this for Windows Task Scheduler.
 
 ### Book menu (pick by risk appetite)
 | Book | Sharpe | CAGR | Max DD | Notes |
 |---|---|---|---|---|
-| **`portfolio`** (risk-parity + vol-target 16%/1.6×) | 1.39 | 16.3% | −13.0% | 15–20% target book |
+| **`portfolio_full`** (6 sleeves + vol-target 17%/1.8×) ⭐ | 1.46 | 18.2% | −13.1% | deployed 15–20% target book |
 | `blended_plus` + full-500 xs + vol-target | 1.44 | 14.5% | −12.7% | no leverage |
 | `regime_adaptive --max-leverage 1.5` | 1.41 | 20.8% | −18.4% | aggressive growth (paper) |
-| `trend_5020 --vol-target 0.12` | 1.36 | 13.7% | −12.7% | single sleeve |
 | `defensive` (+ turn-of-month) | 1.22 | 8.3% | −8.3% | lowest risk |
+| put-write (options income, modeled) | 1.26 | 9.2% | −11.1% | no-leverage defensive income (not deployed) |
 
-> **Lean years:** this is a long-biased book — it has flat years in choppy/sideways
-> markets (2018–2020 ≈ +2%/yr). 15–20% is a multi-year *average*, not a yearly
-> guarantee. See [BOARD_SUMMARY.md](BOARD_SUMMARY.md) §8.
+> **Lean years:** this is a long-biased book — it has softer years in choppy/sideways
+> markets (2018–2020 ≈ +9% total after the recovery sleeve + cash yield). 15–20% is a
+> multi-year *average*, not a yearly guarantee. See [BOARD_SUMMARY.md](BOARD_SUMMARY.md) §8.
 
 ---
 
@@ -141,6 +154,8 @@ quant-agent/
 | `cross_sectional.py` | cross-sectional momentum / dual-momentum sweep |
 | `derisk_wf.py` | vol-targeting + walk-forward on the high-return books |
 | `strategy_lab.py` | candidate-strategy correlation lab + blend tuning |
+| `options_income.py` | no-leverage options income (put-write / covered call), modeled vol-risk-premium + VRP sensitivity |
+| `new_sleeves_screen.py` | screens candidate equity sleeves against the gate + marginal book value |
 | `dump_daily_trades.py` | per-trade CSV logs |
 | `verify_trades_vs_yfinance.py` | data-integrity audit (fills vs yfinance OHLC) |
 | `data_quality_check.py` / `trade_stats.py` | data + win-rate significance diagnostics |
