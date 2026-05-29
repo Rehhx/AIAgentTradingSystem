@@ -229,6 +229,40 @@ def sig_trend_band(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
     return _state_machine(f > s * (1 + band), f < s * (1 - band), c.index)
 
 
+def sig_trend_multi(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
+    """Multi-speed trend: graded exposure = fraction of fast/medium/slow SMA
+    crosses that are long. The fast pair re-enters a recovery weeks before the
+    slow 50/200 (catching V-snapbacks like early 2019 / mid-2020); the slow pair
+    damps whipsaw. Diversifies the lookback instead of betting on one timing."""
+    p = params or {}
+    speeds = p.get("speeds", [(20, 100), (50, 200), (100, 300)])
+    c = d["close"]
+    sigs = [(c.rolling(f).mean() > c.rolling(s).mean()).astype(float) for f, s in speeds]
+    return sum(sigs) / len(sigs)          # 0.0, 0.33, 0.67, 1.0 graded exposure
+
+
+def sig_recovery(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
+    """Recovery-thrust: catch the START of a bull run. When price RECLAIMS its
+    50-day average after having been below its 200-day (a snapback off a low —
+    fired early-2019 and spring-2020), go long and hold for `hold_days` to ride
+    the recovery. Targets the V-recoveries the slow 50/200 trend re-enters late."""
+    p = params or {}
+    hold = int(p.get("hold_days", 120))
+    c = d["close"]
+    sma50, sma200 = c.rolling(50).mean(), c.rolling(200).mean()
+    reclaim = (c > sma50) & (c.shift(1) <= sma50.shift(1))          # crosses up through 50d
+    recently_below = (c < sma200).rolling(30).max().fillna(0).astype(bool)
+    thrust = (reclaim & recently_below).to_numpy()
+    pos, left = np.zeros(len(c)), 0
+    for i in range(len(c)):
+        if thrust[i]:
+            left = hold
+        if left > 0:
+            pos[i] = 1.0
+            left -= 1
+    return pd.Series(pos, index=c.index, dtype=float)
+
+
 def sig_abs_momentum(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
     """Absolute (time-series) momentum: hold long while trailing N-day return is
     positive. Slower, longer-horizon trend than the 50/200 SMA cross."""
@@ -289,6 +323,8 @@ CANDIDATE_STRATEGIES = {
     "abs_momentum":  sig_abs_momentum,
     "capitulation":  sig_capitulation,
     "pead":          sig_pead,
+    "trend_multi":   sig_trend_multi,
+    "recovery":      sig_recovery,
 }
 
 

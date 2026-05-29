@@ -31,7 +31,8 @@ import pandas as pd
 
 from agents.daily_strategies import (
     backtest_book, backtest_cross_sectional, vol_target, _metrics_from_returns,
-    sig_rsi2_meanrev, sig_donchian, sig_trend_5020, DEPLOY_PARAMS, QUALITY_UNIVERSE,
+    sig_rsi2_meanrev, sig_donchian, sig_trend_5020, sig_recovery, sig_pead,
+    sig_trend_multi, DEPLOY_PARAMS, QUALITY_UNIVERSE,
     walk_forward_folds, split_metrics, TRADING_DAYS,
 )
 from data.sp500 import sp500_tickers
@@ -48,14 +49,20 @@ def _trd():   return backtest_book(sig_trend_5020, QUALITY_UNIVERSE)["_returns"]
 def _xs500(): return backtest_cross_sectional(sp500_tickers(), mode="momentum", lookback=252, skip=21, k=10, market_filter=True)["_returns"]
 def _sector(): return backtest_cross_sectional(SECTOR_ETFS, mode="momentum", lookback=126, skip=21, k=4, market_filter=True)["_returns"]
 def _defensive(): return backtest_book(sig_rsi2_meanrev, DEFENSIVE, DEPLOY_PARAMS["rsi2_meanrev"])["_returns"]
+def _recovery(): return backtest_book(sig_recovery, QUALITY_UNIVERSE, {"hold_days": 120})["_returns"]
+def _pead(): return backtest_book(sig_pead, sp500_tickers(), {"gap_pct": 0.05, "vol_mult": 2.0, "hold_days": 60})["_returns"]
+def _trendmulti(): return backtest_book(sig_trend_multi, QUALITY_UNIVERSE)["_returns"]
 
 CANDIDATES = {
     "rsi2_meanrev (quality-10)":      _rsi,
     "donchian (quality-10)":          _don,
     "trend_5020 (quality-10)":        _trd,
     "xs_dualmom (full S&P 500)":      _xs500,
-    "sector_momentum (11 ETFs)":      _sector,      # different universe: sector rotation
-    "defensive_meanrev (staples/util/hlth/gold)": _defensive,  # different universe: low-beta ballast
+    "recovery_thrust (quality-10)":   _recovery,    # captures bull-run snapbacks
+    "pead (full S&P 500)":            _pead,         # event-driven earnings drift
+    "trend_multi (quality-10)":       _trendmulti,   # multi-speed trend
+    "sector_momentum (11 ETFs)":      _sector,       # different universe: sector rotation
+    "defensive_meanrev (staples/util/hlth/gold)": _defensive,  # low-beta ballast
     # add new strategies / different universes here -> they auto-join if they pass
 }
 
