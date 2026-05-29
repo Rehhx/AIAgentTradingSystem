@@ -1468,6 +1468,127 @@ def walk_forward_optimize(
     }
 
 
+def walk_forward_with_market_regime(
+    strategy_name: str,
+    param_grid: dict,
+    target_regime: str,                  # "bull" | "bear" | "high_vol" | "neutral"
+    tickers: Optional[list] = None,
+    start: str = "2022-01-01",
+    end: str = "2025-01-01",
+    train_pct: float = 0.7,
+    data_dir: Path = DATA_DIR,
+) -> dict:
+    """
+    walk-forward with a market regime restriction. signal is computed on the
+    FULL continuous price history (so rolling indicators see real context),
+    but only entries on days that match target_regime are allowed.
+
+    answers: does this strategy have edge when restricted to one regime?
+
+    sharpe interpretation: the reported sharpe is the engine's daily
+    sharpe — flat days (non-target regime) contribute 0 returns, which
+    deflates the apparent sharpe by roughly sqrt(p) where p = fraction
+    of days in target regime. for the "true" sharpe on regime-only days,
+    divide the reported sharpe by sqrt(p).
+    """
+    import itertools
+
+    if strategy_name not in STRATEGIES:
+        return {"success": False, "reason": f"unknown strategy {strategy_name}"}
+    valid_regimes = {"bull", "bear", "high_vol", "neutral"}
+    if target_regime not in valid_regimes:
+        return {"success": False, "reason": f"target_regime must be in {valid_regimes}"}
+
+    tickers = tickers or ["SPY", "QQQ", "TSLA", "NVDA", "AAPL"]
+    fn, default_params = STRATEGIES[strategy_name][0], STRATEGIES[strategy_name][1]
+    allowed = STRATEGY_REGIME_AFFINITY.get(strategy_name)
+
+    # SPY daily regime — computed once, reindexed per ticker
+    try:
+        spy_df = load_ticker("SPY", data_dir=data_dir, start=start, end=end, session="regular")
+    except FileNotFoundError:
+        return {"success": False, "reason": "SPY parquet missing — required for market regime"}
+
+    splits         = {}
+    market_regimes = {}
+    for t in tickers:
+        try:
+            df = load_ticker(t, data_dir=data_dir, start=start, end=end, session="regular")
+            cut = int(len(df) * train_pct)
+            splits[t] = (df.iloc[:cut], df.iloc[cut:])
+            full_mkt  = market_regime_for_df(spy_df, df)
+            market_regimes[t] = (full_mkt.iloc[:cut], full_mkt.iloc[cut:])
+        except FileNotFoundError:
+            continue
+    if not splits:
+        return {"success": False, "reason": "no ticker data"}
+
+    # compute the fraction of bars in target regime (for sharpe interpretation)
+    bull_frac = {}
+    for t, (full_train, full_test) in market_regimes.items():
+        all_mkt   = pd.concat([full_train, full_test])
+        bull_frac[t] = float((all_mkt == target_regime).mean())
+
+    keys   = list(param_grid.keys())
+    combos = [dict(zip(keys, vals)) for vals in itertools.product(*[param_grid[k] for k in keys])]
+    target_set = {target_regime}
+
+    def _avg_sharpe(combo, split_idx):
+        merged    = {**default_params, **combo}
+        stop_mult = merged.get("stop_atr_mult", ATR_STOP_MULT)
+        sharpes, trades_per_ticker = [], []
+        for t, (train_df, test_df) in splits.items():
+            piece     = train_df if split_idx == 0 else test_df
+            mkt_piece = market_regimes[t][split_idx]
+            if len(piece) < 100:
+                continue
+            signal   = fn(piece, merged)
+            regime_s = regime_label_series(piece)
+            r = run_backtest(
+                piece, signal,
+                stop_atr_mult         = stop_mult,
+                regime_series         = regime_s,
+                allowed_regimes       = allowed,
+                market_regime_series  = mkt_piece,
+                allowed_market_regimes= target_set,
+                disable_atr_stop      = bool(merged.get("disable_atr_stop", False)),
+                max_hold_bars         = merged.get("max_hold_bars"),
+            )
+            sharpes.append(r["sharpe"])
+            trades_per_ticker.append(r["total_trades"])
+        return (float(np.mean(sharpes)) if sharpes else float("-inf"),
+                int(sum(trades_per_ticker)))
+
+    train_results = []
+    for combo in combos:
+        sharpe, n_trades = _avg_sharpe(combo, split_idx=0)
+        train_results.append({"params": combo, "train_sharpe": round(sharpe, 4),
+                              "train_trades": n_trades})
+        log.info(f"  WF[{target_regime}] {strategy_name} {combo} "
+                 f"train_sharpe={sharpe:.3f} trades={n_trades}")
+
+    train_results.sort(key=lambda r: r["train_sharpe"], reverse=True)
+    best = train_results[0]
+    test_sharpe, test_trades = _avg_sharpe(best["params"], split_idx=1)
+
+    avg_frac = float(np.mean(list(bull_frac.values()))) if bull_frac else 0.0
+    sqrt_frac = float(np.sqrt(avg_frac)) if avg_frac > 0 else 1.0
+    return {
+        "success":       True,
+        "strategy":      strategy_name,
+        "target_regime": target_regime,
+        "best_params":   best["params"],
+        "train_sharpe":  best["train_sharpe"],
+        "train_trades":  best["train_trades"],
+        "test_sharpe":   round(test_sharpe, 4),
+        "test_trades":   test_trades,
+        "overfit_gap":   round(best["train_sharpe"] - test_sharpe, 4),
+        "regime_fraction": round(avg_frac, 4),       # share of bars in regime
+        "regime_adjusted_test_sharpe": round(test_sharpe / sqrt_frac, 4) if sqrt_frac > 0 else None,
+        "all_results":   train_results,
+    }
+
+
 def walk_forward_with_gate(
     strategy_name: str,
     ticker: str,
@@ -1886,6 +2007,13 @@ class BacktestingAgent:
         drawdowns = [r["max_drawdown"] for r in all_results.values()]
         winrates  = [r["win_rate"]     for r in all_results.values()]
         trades    = [r["total_trades"] for r in all_results.values()]
+        # dollar P&L: each ticker backtest started with INITIAL_CAP. average
+        # the per-ticker final_capital across tickers so a strategy tested on
+        # 5 tickers reports the "typical" account outcome at $100k start.
+        final_caps    = [r.get("final_capital", INITIAL_CAP) for r in all_results.values()]
+        total_returns = [r.get("total_return", 0.0)          for r in all_results.values()]
+        avg_final = float(np.mean(final_caps))
+        avg_ret   = float(np.mean(total_returns))
 
         aggregate = {
             "sharpe":       round(float(np.mean(sharpes)), 4),
@@ -1893,6 +2021,10 @@ class BacktestingAgent:
             "win_rate":     round(float(np.mean(winrates)), 4),
             "total_trades": int(np.sum(trades)),
             "calmar":       round(float(np.mean([r["calmar"] for r in all_results.values()])), 4),
+            "total_return": round(avg_ret, 6),               # fraction, e.g. -0.0123
+            "final_capital": round(avg_final, 2),            # $ ending balance (avg per ticker)
+            "pnl_dollars":   round(avg_final - INITIAL_CAP, 2),   # $ P&L vs $100k start
+            "initial_capital": INITIAL_CAP,
         }
 
         return {

@@ -24,22 +24,89 @@ from config import ANTHROPIC_API_KEY
 log = logging.getLogger("research_agent")
 
 
-RESEARCH_PROMPT = """\
-You are a quantitative research analyst. Search recent arxiv papers, quant
-blogs (QuantConnect, SSRN, Robot Wealth), and known strategy databases for
-intraday trading strategies on US equities using 1-minute bar data.
+RESEARCH_PROMPT_TEMPLATE = """\
+You are a quantitative research analyst.
 
-Return up to 5 strategy ideas as JSON. Each must have:
+=== MISSION (urgent) ===
+We need a DEPLOYABLE strategy targeting a 10-20% ANNUAL RETURN that passes our
+risk gate: Sharpe >= 0.8, max drawdown >= -15%, win rate >= 45%, AND >= 100
+trades/year. There is a hard deadline — propose ideas that can be validated fast.
+
+DECISIVE LESSON: 1-MINUTE INTRADAY IS DEAD. At our 6 bps round-trip cost, intraday
+strategies bleed (dozens of -1 to -30 Sharpe examples in the ledger below). What
+WORKS is DAILY / multi-day holds (2-20 trading days), where cost is negligible.
+Our deployed winners are all daily. Propose DAILY / SWING strategies with a real
+economic mechanism (mean reversion, trend, carry, seasonality, cross-sectional
+momentum) — NOT intraday scalps.
+
+Your job has TWO parts:
+
+  PART A (discovery) — Search arxiv, SSRN, QuantConnect, Robot Wealth, etc.
+  for 2-3 strategies that match the user's query and are NOT in our existing
+  registry below. Cite the source URL for each.
+
+  PART B (invention) — Design 2-3 NEW strategies of your own, not from any
+  paper. Use your understanding of market microstructure to invent novel
+  ideas. Mark these with source_url = "novel_invention". The mechanism field
+  is critical: explain WHY this should work.
+
+EXISTING STRATEGIES IN OUR REGISTRY (do NOT propose duplicates or trivial
+variants of these — we have already tested them):
+{existing_strategies}
+
+Recent backtest findings to inform your designs:
+- DAILY holds work: RSI-2 mean reversion (buy short-term dips in an uptrend)
+  gives out-of-sample Sharpe ~1.1 at ~112 trades/yr; a blended daily book
+  (RSI-2 + Donchian breakout + 50/200 trend) passes risk at Sharpe 1.09, +8.6%/yr.
+- 1-minute intraday strategies ALL fail: cost drag dominates (trade count tracks
+  loss magnitude almost perfectly). Do NOT propose them.
+- To reach 10-20%/yr we likely need trend / cross-sectional momentum on daily
+  bars (these run hotter) paired with mean reversion for drawdown control.
+
+Return JSON list of up to 6 ideas. Each must have:
   - name:        short identifier, snake_case
   - description: 1-2 sentences
-  - hypothesis:  the market microstructure / behavioral reason it works
+  - hypothesis:  market microstructure / behavioral reason it works
   - params:      dict of default parameters
-  - timeframe:   "1min", "5min", "15min", or "1h"
+  - timeframe:   "1d" or "swing" (PREFERRED, 2-20 day hold). Avoid intraday.
   - direction:   "long_only", "short_only", or "both"
-  - source_url:  the paper or blog you got it from
+  - source_url:  paper URL, or "novel_invention" for Part B
+  - kind:        "discovery" or "invention"
 
-Only include strategies you can cite a source for.
+For invention entries: prioritize DAILY / multi-day strategies that fire
+100-500 times per YEAR with a verifiable structural mechanism, target a 10-20%
+annual return, and could pass the risk gate. Do NOT curve-fit intraday indicators.
 """
+
+
+def _existing_strategies_summary() -> str:
+    """build a compact text summary of registered STRATEGIES for the prompt."""
+    try:
+        from agents.backtesting_agent import STRATEGIES, STRATEGY_REGIME_AFFINITY
+    except Exception:
+        return "  (unable to load registry)"
+    lines = []
+    for key, entry in STRATEGIES.items():
+        params = entry[1] if len(entry) > 1 else {}
+        # only show non-execution params
+        keys_to_show = [k for k in params if k not in
+                        ("active", "stop_atr_mult", "max_hold_bars",
+                         "disable_atr_stop")][:4]
+        param_str = ", ".join(f"{k}={params[k]}" for k in keys_to_show)
+        affinity = ", ".join(sorted(STRATEGY_REGIME_AFFINITY.get(key, []))) or "any"
+        lines.append(f"  - {key}({param_str})  [regimes: {affinity}]")
+    base = "\n".join(lines) if lines else "  (registry empty)"
+
+    # append the persistent ledger so agents still know about strategies whose
+    # code was removed (tried & rejected) and won't re-propose them.
+    try:
+        from agents.strategy_ledger import ledger_summary_for_prompt
+        led = ledger_summary_for_prompt()
+        if led and "no prior" not in led:
+            base += "\n\nPERSISTENT LEDGER — every strategy already evaluated:\n" + led
+    except Exception:
+        pass
+    return base
 
 
 class ResearchAgent:
@@ -56,9 +123,14 @@ class ResearchAgent:
 
         try:
             from agents._claude_sdk import ask_claude
+            # build the system prompt with the current registry inlined so the
+            # SDK knows what NOT to propose and what we've already tried.
+            system_prompt = RESEARCH_PROMPT_TEMPLATE.format(
+                existing_strategies=_existing_strategies_summary(),
+            )
             response = ask_claude(
                 prompt        = task.get("payload", {}).get("query", "intraday equity strategies 2024"),
-                system_prompt = RESEARCH_PROMPT,
+                system_prompt = system_prompt,
                 allowed_tools = ["WebSearch", "WebFetch"],
                 model         = "claude-opus-4-7",
                 debug_log_path = "results/research_raw_response.txt",

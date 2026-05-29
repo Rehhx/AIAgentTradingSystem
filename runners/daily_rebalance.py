@@ -1,0 +1,282 @@
+"""
+runners/daily_rebalance.py
+--------------------------
+Daily rebalancer that takes a daily book LIVE on Alpaca paper. This is the
+Monday-deployment path for the strategy validated in runners/daily_book.py.
+
+Each trading day after the close (or before the next open) you run this once:
+
+  1. fetch recent daily bars for the universe (yfinance, split-adjusted; falls
+     back to local parquet if offline)
+  2. compute each sub-strategy's current long/flat position as of the last close
+  3. turn positions into equal-weight target dollar weights for the book
+  4. read current Alpaca paper positions + account equity
+  5. diff target vs current and submit market orders for the deltas
+     (DRY-RUN by default — prints the plan; pass --live to actually trade)
+
+Books:
+  rsi2_meanrev | donchian | trend_5020 | blended   (default: blended)
+
+Usage:
+  python runners\\daily_rebalance.py --book blended --universe SPY,QQQ,GLD,MSFT,JPM,GOOGL
+  python runners\\daily_rebalance.py --book blended --live          # actually trades paper
+"""
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import numpy as np
+import pandas as pd
+
+from agents.daily_strategies import (
+    STRATEGIES_DAILY, CANDIDATE_STRATEGIES, DEPLOY_PARAMS,
+    DEFAULT_UNIVERSE, QUALITY_UNIVERSE, daily_bars,
+)
+from agents.execution_agent import ExecutionAgent
+
+# all sig functions available to the rebalancer (core + promoted candidates)
+ALL_SIGNALS = {**STRATEGIES_DAILY, **CANDIDATE_STRATEGIES}
+
+# each book maps sub-strategy -> capital weight (weights sum to 1).
+BOOKS = {
+    "rsi2_meanrev": {"rsi2_meanrev": 1.0},
+    "donchian":     {"donchian": 1.0},
+    "trend_5020":   {"trend_5020": 1.0},
+    "blended":      {"rsi2_meanrev": 1/3, "donchian": 1/3, "trend_5020": 1/3},
+    # trend-tilted blend: ~12% CAGR, Sharpe ~1.25, -17% DD (needs DD limit ~-18%)
+    "trend_tilt":   {"trend_5020": 0.5, "rsi2_meanrev": 0.5},
+    # defensive: adds the uncorrelated turn-of-month sleeve -> lowest DD (~-8%)
+    "defensive":    {"rsi2_meanrev": 0.25, "donchian": 0.25,
+                     "trend_5020": 0.25, "turn_of_month": 0.25},
+    # blended_plus: core-3 + cross-sectional dual-momentum -> Sharpe 1.26,
+    # 11.5% CAGR, -13.9% DD (passes risk; best return-per-risk found so far)
+    "blended_plus": {"rsi2_meanrev": 0.25, "donchian": 0.25,
+                     "trend_5020": 0.25, "xs_dualmom": 0.25},
+}
+
+
+def fetch_daily(ticker: str, lookback_days: int = 400, source: str = "auto") -> pd.DataFrame:
+    """recent split-adjusted daily bars. yfinance first (fresh, adjusted),
+    parquet fallback (stale but offline-safe)."""
+    if source in ("auto", "yfinance"):
+        try:
+            import yfinance as yf
+            raw = yf.Ticker(ticker).history(
+                period=f"{lookback_days + 50}d", interval="1d", auto_adjust=True)
+            if not raw.empty:
+                raw = raw.rename(columns={"Open": "open", "High": "high",
+                                          "Low": "low", "Close": "close",
+                                          "Volume": "volume"})
+                idx = raw.index
+                raw.index = idx.tz_convert("UTC") if idx.tz else idx.tz_localize("UTC")
+                return raw[["open", "high", "low", "close", "volume"]].dropna()
+        except Exception as e:
+            if source == "yfinance":
+                raise
+            print(f"  [warn] yfinance failed for {ticker} ({e}); using local parquet")
+    return daily_bars(ticker).tail(lookback_days + 50)
+
+
+# cross-sectional dual-momentum sleeve config (matches backtest_cross_sectional)
+XS_LOOKBACK, XS_SKIP, XS_MKT, XS_SMA = 252, 21, "SPY", 200
+
+
+def target_weights(book: str, universe: list, source: str = "auto",
+                   xs_universe: str = "same", vol_target_pct: float = 0.0,
+                   max_lev: float = 1.0) -> tuple[dict, dict, dict]:
+    """returns (weights, last_price, detail). Per-ticker sleeves give each long
+    name alloc/N. The 'xs_dualmom' sleeve ranks a (possibly larger) universe by
+    12-1 momentum and gives the top-K names alloc/K (cash when SPY < its 200d
+    SMA). vol_target_pct>0 scales the whole book to that annualized vol."""
+    strat_weights = dict(BOOKS[book])        # {strategy: capital weight}
+    xs_alloc = strat_weights.pop("xs_dualmom", 0.0)
+    n = len(universe)
+    weights = {t: 0.0 for t in universe}
+    last_price, detail, closes = {}, {t: [] for t in universe}, {}
+    for t in universe:
+        try:
+            d = fetch_daily(t, source=source)
+        except Exception as e:
+            print(f"  [skip] {t}: {e}")
+            continue
+        if len(d) < 220:
+            print(f"  [skip] {t}: only {len(d)} daily bars (<220 warmup)")
+            continue
+        last_price[t] = float(d["close"].iloc[-1])
+        closes[t] = d["close"]
+        for s, alloc in strat_weights.items():
+            pos = ALL_SIGNALS[s](d, DEPLOY_PARAMS.get(s) or None)
+            if float(pos.iloc[-1]) > 0:      # position as of the last close
+                weights[t] += alloc * (1.0 / n)
+                detail[t].append(s)
+
+    # cross-sectional dual-momentum sleeve (rank over `universe` or full S&P 500)
+    if xs_alloc > 0:
+        market_ok = True
+        try:
+            mkt = fetch_daily(XS_MKT, source=source)["close"]
+            market_ok = float(mkt.iloc[-1]) > float(mkt.rolling(XS_SMA).mean().iloc[-1])
+        except Exception:
+            pass
+        if market_ok:
+            if xs_universe == "sp500":
+                from data.sp500 import sp500_tickers
+                rank_closes, k = {}, 10
+                for t in sp500_tickers():
+                    try:
+                        rank_closes[t] = daily_bars(t)["close"]   # adjusted, cached
+                    except Exception:
+                        continue
+            else:
+                rank_closes, k = closes, 3
+            scores = {t: float(c.iloc[-1 - XS_SKIP] / c.iloc[-1 - XS_SKIP - XS_LOOKBACK] - 1)
+                      for t, c in rank_closes.items() if len(c) > XS_SKIP + XS_LOOKBACK + 1}
+            for t in sorted(scores, key=scores.get, reverse=True)[:k]:
+                weights[t] = weights.get(t, 0.0) + xs_alloc * (1.0 / k)
+                detail.setdefault(t, []).append("xs_dualmom")
+                if t not in last_price:
+                    last_price[t] = float(rank_closes[t].iloc[-1])
+                    closes[t] = rank_closes[t]
+
+    # volatility-targeting overlay: scale the whole book to target annualized vol
+    if vol_target_pct > 0:
+        held = {t: w for t, w in weights.items() if w > 0 and t in closes}
+        if held:
+            sub = pd.concat([closes[t].pct_change() for t in held], axis=1, sort=True)
+            wv = np.array([held[t] for t in held], float); wv /= wv.sum()
+            port_r = (sub.fillna(0.0) * wv).sum(axis=1).tail(60)
+            rv = float(port_r.std() * np.sqrt(252))
+            scale = min(max_lev, vol_target_pct / rv) if rv > 0 else 1.0
+            weights = {t: w * scale for t, w in weights.items()}
+            print(f"  [vol-target {vol_target_pct:.0%}] recent vol {rv:.0%} "
+                  f"-> exposure scale {scale:.2f}x")
+    return weights, last_price, detail
+
+
+def get_equity(agent: ExecutionAgent, override: float | None) -> tuple[float, str]:
+    if override:
+        return override, "override"
+    if not agent.simulated and agent.client is not None:
+        try:
+            acct = agent.client.get_account()
+            return float(acct.equity), "alpaca"
+        except Exception as e:
+            print(f"  [warn] could not read Alpaca equity ({e}); using $100k")
+    return 100_000.0, "default"
+
+
+def current_positions(agent: ExecutionAgent) -> dict:
+    return {p["symbol"]: float(p["qty"]) for p in agent.get_positions()}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--book", default="blended", choices=list(BOOKS))
+    ap.add_argument("--universe", default="quality",
+                    help="comma list, or 'quality' (10 locked names), or 'default' (8)")
+    ap.add_argument("--live", action="store_true", help="actually submit paper orders")
+    ap.add_argument("--notional", type=float, default=None,
+                    help="override account equity used for sizing (dry-run default $100k)")
+    ap.add_argument("--source", default="auto", choices=["auto", "yfinance", "parquet"])
+    ap.add_argument("--xs-universe", default="same", choices=["same", "sp500"],
+                    help="ranking universe for the cross-sectional sleeve")
+    ap.add_argument("--vol-target", type=float, default=0.0,
+                    help="annualized vol target (e.g. 0.12); 0 = off")
+    ap.add_argument("--max-leverage", type=float, default=1.0,
+                    help="max exposure when vol-targeting (1.0 = de-risk only)")
+    ap.add_argument("--whole-shares", action="store_true",
+                    help="use integer shares (default: fractional/notional dollar orders)")
+    ap.add_argument("--min-order", type=float, default=250.0,
+                    help="no-trade band: skip reconciling orders smaller than $X")
+    args = ap.parse_args()
+
+    if args.universe.strip().lower() == "quality":
+        universe = list(QUALITY_UNIVERSE)
+    elif args.universe.strip().lower() == "default":
+        universe = list(DEFAULT_UNIVERSE)
+    else:
+        universe = [t.strip().upper() for t in args.universe.split(",") if t.strip()]
+    mode = "LIVE (paper)" if args.live else "DRY-RUN"
+    print(f"\nDaily rebalance | book={args.book} | {mode}")
+    print(f"Universe ({len(universe)}): {', '.join(universe)}\n")
+
+    agent = ExecutionAgent()
+    if args.live and agent.simulated:
+        print("  [warn] Alpaca creds missing -- --live will only SIMULATE fills.")
+
+    weights, last_price, detail = target_weights(
+        args.book, universe, args.source, xs_universe=args.xs_universe,
+        vol_target_pct=args.vol_target, max_lev=args.max_leverage)
+    equity, esrc = get_equity(agent, args.notional)
+    held = current_positions(agent)
+
+    print(f"Account equity: ${equity:,.0f} (source: {esrc})")
+    invested = sum(weights.values())
+    print(f"Target invested: {invested:.0%} | cash: {max(0, 1 - invested):.0%}\n")
+
+    sizing = "whole-share" if args.whole_shares else "fractional (notional $)"
+    print(f"Sizing: {sizing} | no-trade band: ${args.min_order:,.0f}\n")
+    hdr = (f"{'ticker':7s} {'signals':28s} {'tgt_w':>6s} {'price':>9s} "
+           f"{'tgt_$':>9s} {'cur_$':>9s} {'delta_$':>9s} {'action':>6s}")
+    print(hdr)
+    print("-" * len(hdr))
+
+    orders = []
+    # trade every name with a target weight (incl. cross-sectional picks outside
+    # the base universe) plus anything currently held
+    trade_set = sorted(set(t for t, w in weights.items() if w > 0) | set(held))
+    for t in trade_set:
+        w = weights.get(t, 0.0)
+        cur_sh = float(held.get(t, 0))
+        if t not in last_price:
+            if cur_sh != 0:                       # held, no price -> liquidate by qty
+                print(f"{t:7s} {'(exit, no price)':28s} {0:6.1%} {'-':>9s} "
+                      f"{'-':>9s} {'-':>9s} {'exit':>9s} {'SELL':>6s}")
+                orders.append({"ticker": t, "side": "sell", "qty": abs(cur_sh)})
+            continue
+        px = last_price[t]
+        tgt_dollar = w * equity
+        cur_dollar = cur_sh * px
+        delta_dollar = tgt_dollar - cur_dollar
+        sigs = ",".join(detail.get(t, [])) if detail.get(t) else "(flat)"
+
+        if w <= 0 and cur_sh > 0:                 # full exit -> sell the whole position
+            action = "SELL"
+            orders.append({"ticker": t, "side": "sell", "qty": abs(cur_sh)})
+        elif abs(delta_dollar) >= args.min_order:
+            action = "BUY" if delta_dollar > 0 else "SELL"
+            if args.whole_shares:
+                qty = abs(int(delta_dollar / px))
+                if qty > 0:
+                    orders.append({"ticker": t, "side": action.lower(), "qty": qty})
+                else:
+                    action = "skip"
+            else:
+                orders.append({"ticker": t, "side": action.lower(),
+                               "notional": round(abs(delta_dollar), 2)})
+        else:
+            action = "hold"                       # inside the no-trade band
+        print(f"{t:7s} {sigs:28s} {w:6.1%} {px:9.2f} {tgt_dollar:9,.0f} "
+              f"{cur_dollar:9,.0f} {delta_dollar:9,.0f} {action:>6s}")
+
+    print(f"\n{len(orders)} order(s) to reconcile.")
+    if not orders:
+        print("Portfolio already aligned -- nothing to do.")
+        return
+    if not args.live:
+        print("DRY-RUN -- no orders sent. Re-run with --live to execute on Alpaca paper.")
+        return
+
+    print("Submitting orders...")
+    for o in orders:
+        res = agent.run({"payload": {"signal": {**o, "order_type": "market",
+                                                "time_in_force": "day"}},
+                         "strategy_id": f"daily_{args.book}"})
+        status = res.get("fill", {}).get("status", res.get("reason"))
+        print(f"  {o['side'].upper():4s} {o['qty']:>5d} {o['ticker']:6s} -> {status}")
+
+
+if __name__ == "__main__":
+    main()

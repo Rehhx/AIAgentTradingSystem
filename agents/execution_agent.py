@@ -73,20 +73,22 @@ class ExecutionAgent:
 
         ticker = sig.get("ticker")
         side   = sig.get("side", "buy").lower()
-        qty    = int(sig.get("qty", 0))
+        qty    = float(sig.get("qty", 0) or 0)        # may be fractional
+        notional = float(sig.get("notional", 0) or 0)  # dollar-sized (fractional)
 
-        if not ticker or qty <= 0 or side not in ("buy", "sell"):
+        if not ticker or side not in ("buy", "sell") or (qty <= 0 and notional <= 0):
             return self._failure(f"invalid signal: {sig}")
 
         order_type = sig.get("order_type", "market").lower()
         tif        = sig.get("time_in_force", "day").lower()
+        amount     = f"${notional:,.0f}" if notional > 0 else f"{qty:g} sh"
 
         if self.simulated:
-            fill = self._simulated_fill(ticker, side, qty, order_type)
+            fill = self._simulated_fill(ticker, side, notional or qty, order_type)
         else:
             try:
-                fill = self._submit_alpaca(ticker, side, qty, order_type, tif,
-                                          sig.get("limit_price"))
+                fill = self._submit_alpaca(ticker, side, qty, notional, order_type,
+                                           tif, sig.get("limit_price"))
             except Exception as e:
                 self.log.exception(f"alpaca order failed: {e}")
                 return self._failure(f"alpaca submit error: {e}")
@@ -94,7 +96,7 @@ class ExecutionAgent:
         fill["strategy_id"] = strategy_id
         if self.store is not None:
             self.store.log_trade(fill)
-        self.log.info(f"executed | {side} {qty} {ticker} -> {fill.get('status')}")
+        self.log.info(f"executed | {side} {amount} {ticker} -> {fill.get('status')}")
         return self._success(fill=fill)
 
     def get_positions(self) -> list:
@@ -117,7 +119,7 @@ class ExecutionAgent:
     # internals
     # ------------------------------------------------------------------
 
-    def _submit_alpaca(self, ticker, side, qty, order_type, tif, limit_price):
+    def _submit_alpaca(self, ticker, side, qty, notional, order_type, tif, limit_price):
         from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
         from alpaca.trading.enums import OrderSide, TimeInForce
 
@@ -131,6 +133,12 @@ class ExecutionAgent:
                 symbol=ticker, qty=qty, side=side_enum,
                 time_in_force=tif_enum, limit_price=float(limit_price),
             )
+        elif notional and notional > 0:
+            # fractional (dollar-sized) market order — Alpaca requires DAY tif
+            req = MarketOrderRequest(
+                symbol=ticker, notional=round(float(notional), 2),
+                side=side_enum, time_in_force=TimeInForce.DAY,
+            )
         else:
             req = MarketOrderRequest(
                 symbol=ticker, qty=qty, side=side_enum, time_in_force=tif_enum,
@@ -141,6 +149,7 @@ class ExecutionAgent:
             "ticker":     ticker,
             "side":       side,
             "qty":        qty,
+            "notional":   notional or None,
             "order_id":   str(order.id),
             "client_order_id": getattr(order, "client_order_id", None),
             "status":     str(getattr(order, "status", "submitted")),

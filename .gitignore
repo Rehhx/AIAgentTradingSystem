@@ -1,0 +1,29 @@
+# secrets / environment
+.env
+.env.*
+!env.example
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# large / local / reproducible data + caches
+data/cache/
+*.parquet
+vector_stores/.cache/
+vector_stores/chroma_db/
+
+# generated outputs (reproducible by re-running the scripts)
+results/
+logs/
+
+# local agent working memory (not part of the public repo)
+memory/

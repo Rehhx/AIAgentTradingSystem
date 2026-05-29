@@ -36,6 +36,15 @@ ALPACA_PAPER      = True   # always True until we deliberately go live
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # ---------------------------------------------------------------------------
+# supplementary free market data sources (used by data.multi_source)
+# ---------------------------------------------------------------------------
+# finnhub: real-time quotes, news, sentiment   (free 60 req/min)
+# fred:    macroeconomic series                (free, generous)
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
+FRED_API_KEY    = os.getenv("FRED_API_KEY", "")
+OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY", "")   # already used by regime store
+
+# ---------------------------------------------------------------------------
 # risk thresholds (risk_agent uses these)
 # ---------------------------------------------------------------------------
 RISK = {

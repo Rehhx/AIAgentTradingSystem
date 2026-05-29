@@ -246,6 +246,87 @@ class MLResearchAgent:
 
         return {"success": True, "agent": "ml_research_agent", "metrics": metrics}
 
+    # ------------------------------------------------------------------
+    # research mode — propose new ML approaches via Claude SDK
+    # ------------------------------------------------------------------
+
+    def research(self, query: Optional[str] = None) -> dict:
+        """
+        ask Claude for novel ML/DL approaches to try on our 1m bar data.
+        distinct from the research_agent (which proposes rule-based
+        strategies); this agent proposes (architecture, features, target)
+        combinations to feed back into the training pipeline.
+
+        the prompt is informed by our current feature set + known result
+        (XGBoost AUC ≈ 0.51 on standard TA features = essentially random),
+        so the SDK is asked to propose ideas that go BEYOND that.
+        """
+        try:
+            from agents._claude_sdk import ask_claude
+        except ImportError:
+            return {"success": False, "reason": "claude_agent_sdk not installed"}
+
+        from agents.research_agent import _existing_strategies_summary
+        system_prompt = (
+            "You are an ML researcher proposing models to predict equity returns.\n\n"
+            "=== MISSION (urgent) ===\n"
+            "We need a DEPLOYABLE strategy targeting a 10-20% ANNUAL RETURN that passes "
+            "risk: Sharpe >= 0.8, max drawdown >= -15%, win rate >= 45%, >= 100 "
+            "trades/year. Hard deadline.\n"
+            "DECISIVE LESSON: predicting 1-MINUTE / intraday returns is DEAD — every ML "
+            "model we built overtraded (40k-400k trades) and bled -7 to -30 Sharpe at "
+            "6 bps cost. PREDICT DAILY / MULTI-DAY returns (forward 1-10 DAY horizon) so "
+            "positions are held for days and trade ~100-500x/year. Build on our working "
+            "daily strategies (RSI-2 mean reversion, trend), e.g. as a meta-label/filter.\n\n"
+            "OUR CURRENT BASELINE:\n"
+            "  - XGBoost on standard TA features (RSI, ATR, EMA ratios, regime one-hot, "
+            "    lagged returns, time-of-day)\n"
+            "  - On 1m bars predicting 5-bar returns: AUC ~0.51 (random) and it overtrades.\n"
+            "  - The opportunity is on DAILY bars with multi-day targets.\n\n"
+            "OUR STRATEGY REGISTRY + LEDGER (so you don't duplicate work already tried):\n"
+            f"{_existing_strategies_summary()}\n\n"
+            "Propose 3-5 DAILY-timeframe ML/DL approaches that could yield a tradeable "
+            "10-20%/yr book (low turnover, passes risk). For each, specify:\n"
+            "  - name: short snake_case identifier\n"
+            "  - architecture: e.g. 'gradient_boosted_trees', 'temporal_cnn', "
+            "    'transformer', 'gradient_boosting_with_meta_label'\n"
+            "  - features: list of feature group names (be specific — 'realized_vol_skew', "
+            "    'opening_range_position', 'cross_sectional_rank', etc.)\n"
+            "  - target: prediction target on a DAILY horizon (e.g. sign of forward "
+            "    3-10 DAY return, multi-day vol regime) — NOT intraday bars\n"
+            "  - hypothesis: why this should improve on the baseline\n"
+            "  - implementation_notes: one sentence on how to wire it into the "
+            "    existing build_features() / TRAINERS pipeline (on daily bars)\n\n"
+            "Return as JSON list. Prioritize LOW-TURNOVER daily approaches that exploit "
+            "information NOT in standard TA features (cross-sectional rank, regime "
+            "interaction, meta-labeling on top of RSI-2/trend signals) and that target "
+            "a 10-20%/yr book passing the risk gate."
+        )
+
+        try:
+            response = ask_claude(
+                prompt        = query or "Propose ML approaches that could beat AUC 0.51 baseline.",
+                system_prompt = system_prompt,
+                allowed_tools = ["WebSearch", "WebFetch"],
+                model         = "claude-opus-4-7",
+                debug_log_path = "results/ml_research_raw.txt",
+            )
+        except Exception as e:
+            return {"success": False, "reason": f"sdk call failed: {e}"}
+
+        # reuse the research_agent's robust JSON parser
+        from agents.research_agent import ResearchAgent
+        approaches = ResearchAgent()._parse_strategies(response)
+        if not approaches and response:
+            self.log.warning(f"parser found 0 approaches in {len(response)}-char response")
+
+        return {
+            "success":   True,
+            "agent":     "ml_research_agent",
+            "approaches": approaches,
+            "raw_len":   len(response or ""),
+        }
+
 
 # ---------------------------------------------------------------------------
 # standalone runner
