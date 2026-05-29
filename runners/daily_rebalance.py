@@ -54,7 +54,35 @@ BOOKS = {
     # 11.5% CAGR, -13.9% DD (passes risk; best return-per-risk found so far)
     "blended_plus": {"rsi2_meanrev": 0.25, "donchian": 0.25,
                      "trend_5020": 0.25, "xs_dualmom": 0.25},
+    # portfolio: the auto-allocator's RISK-PARITY weights over the 4 admitted
+    # strategies (inverse-vol). With --vol-target 0.16 --max-leverage 1.6 -> ~16.2%
+    # CAGR, -13.0% DD, Sharpe 1.38, 5/5 walk-forward folds. The 15-20% target book.
+    "portfolio":    {"rsi2_meanrev": 0.41, "donchian": 0.32,
+                     "trend_5020": 0.18, "xs_dualmom": 0.09},
+    # regime_adaptive: weights + leverage shift by SPY regime (see _detect_regime).
+    # AGGRESSIVE growth book — leverage is OPT-IN via --max-leverage (default 1.0
+    # = regime tilting, no leverage). With --max-leverage 1.5: ~20% CAGR, ~-18% DD.
+    "regime_adaptive": {"_regime": 1.0},
 }
+
+# per-regime (per-ticker sleeve weights, xs_dualmom alloc, leverage)
+REGIME_WEIGHTS = {
+    "bull_calm": ({"trend_5020": 0.30, "rsi2_meanrev": 0.15, "donchian": 0.15}, 0.40, 1.5),
+    "bull_vol":  ({"rsi2_meanrev": 0.45, "donchian": 0.20, "trend_5020": 0.20}, 0.15, 1.0),
+    "bear":      ({}, 0.0, 1.0),   # defensive: gold + cash, handled below
+}
+
+
+def _detect_regime(source: str) -> str:
+    """SPY 200-day trend + 20-day realized vol -> bull_calm / bull_vol / bear."""
+    spy = fetch_daily("SPY", source=source)["close"]
+    if len(spy) < 210:
+        return "bull_calm"
+    trend_up = float(spy.iloc[-1]) > float(spy.rolling(200).mean().iloc[-1])
+    vol = float(spy.pct_change().rolling(20).std().iloc[-1]) * (252 ** 0.5)
+    if not trend_up:
+        return "bear"
+    return "bull_vol" if vol >= 0.16 else "bull_calm"
 
 
 def fetch_daily(ticker: str, lookback_days: int = 400, source: str = "auto") -> pd.DataFrame:
@@ -90,8 +118,19 @@ def target_weights(book: str, universe: list, source: str = "auto",
     name alloc/N. The 'xs_dualmom' sleeve ranks a (possibly larger) universe by
     12-1 momentum and gives the top-K names alloc/K (cash when SPY < its 200d
     SMA). vol_target_pct>0 scales the whole book to that annualized vol."""
-    strat_weights = dict(BOOKS[book])        # {strategy: capital weight}
-    xs_alloc = strat_weights.pop("xs_dualmom", 0.0)
+    leverage, bear = 1.0, False
+    if book == "regime_adaptive":
+        regime = _detect_regime(source)
+        w, xs_a, reg_lev = REGIME_WEIGHTS[regime]
+        strat_weights = dict(w)
+        xs_alloc = xs_a
+        leverage = min(reg_lev, max_lev) if max_lev > 1.0 else 1.0  # leverage OPT-IN
+        bear = (regime == "bear")
+        xs_universe = "sp500"                # rank the cross-sectional sleeve index-wide
+        print(f"  [regime] {regime} | sleeve leverage {leverage:.2f}x (cap {max_lev}) | xs=S&P500")
+    else:
+        strat_weights = dict(BOOKS[book])    # {strategy: capital weight}
+        xs_alloc = strat_weights.pop("xs_dualmom", 0.0)
     n = len(universe)
     weights = {t: 0.0 for t in universe}
     last_price, detail, closes = {}, {t: [] for t in universe}, {}
@@ -139,6 +178,18 @@ def target_weights(book: str, universe: list, source: str = "auto",
                 if t not in last_price:
                     last_price[t] = float(rank_closes[t].iloc[-1])
                     closes[t] = rank_closes[t]
+
+    # regime_adaptive: bear -> defensive gold+cash; else apply conditional leverage
+    if book == "regime_adaptive":
+        if bear:
+            weights = {t: 0.0 for t in weights}
+            if "GLD" in last_price:
+                weights["GLD"] = 0.40
+                detail.setdefault("GLD", []).append("regime:bear-gold")
+            else:
+                print("  [regime] bear -> 100% cash (GLD not in universe)")
+        elif leverage != 1.0:
+            weights = {t: w * leverage for t, w in weights.items()}
 
     # volatility-targeting overlay: scale the whole book to target annualized vol
     if vol_target_pct > 0:
