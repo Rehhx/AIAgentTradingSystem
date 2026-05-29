@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="520" viewBox="0 0 1120 520" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect width="1120" height="520" fill="#0d1117"/>
+
+  <!-- header -->
+  <text x="32" y="42" fill="#e6edf3" font-size="30" font-weight="700">quant-agent</text>
+  <text x="32" y="66" fill="#8b949e" font-size="14">Autonomous multi-agent system — researches, validates &amp; paper-trades daily quant strategies (Claude Agent SDK + Alpaca)</text>
+  <g font-size="11" fill="#8b949e">
+    <rect x="32" y="80" width="118" height="22" rx="11" fill="none" stroke="#30363d"/><text x="44" y="95">backtest 2016–2026</text>
+    <rect x="158" y="80" width="120" height="22" rx="11" fill="none" stroke="#30363d"/><text x="170" y="95">6 bps round-trip</text>
+    <rect x="286" y="80" width="138" height="22" rx="11" fill="none" stroke="#30363d"/><text x="298" y="95">walk-forward 5/5</text>
+  </g>
+
+  <!-- KPI cards -->
+  <g>
+    <rect x="32"  y="116" width="205" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="48" y="158" fill="#3fb950" font-size="28" font-weight="700">1.44</text>
+    <text x="48" y="180" fill="#8b949e" font-size="11">SHARPE RATIO</text>
+
+    <rect x="251" y="116" width="205" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="267" y="158" fill="#3fb950" font-size="28" font-weight="700">14.5%</text>
+    <text x="267" y="180" fill="#8b949e" font-size="11">CAGR</text>
+
+    <rect x="470" y="116" width="205" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="486" y="158" fill="#d29922" font-size="28" font-weight="700">−12.7%</text>
+    <text x="486" y="180" fill="#8b949e" font-size="11">MAX DRAWDOWN</text>
+
+    <rect x="689" y="116" width="205" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="705" y="158" fill="#3fb950" font-size="28" font-weight="700">+$308,115</text>
+    <text x="705" y="180" fill="#8b949e" font-size="11">P&amp;L ON $100K</text>
+
+    <rect x="908" y="116" width="180" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="924" y="158" fill="#3fb950" font-size="28" font-weight="700">5 / 5</text>
+    <text x="924" y="180" fill="#8b949e" font-size="11">WALK-FORWARD FOLDS +</text>
+  </g>
+
+  <!-- equity curve panel -->
+  <rect x="32" y="216" width="672" height="276" rx="12" fill="#161b22" stroke="#30363d"/>
+  <text x="50" y="244" fill="#e6edf3" font-size="14" font-weight="600">Equity curve — $100k → $408k</text>
+  <text x="50" y="262" fill="#8b949e" font-size="11">ensemble: RSI-2 + Donchian + 50/200 trend + cross-sectional dual-momentum (S&amp;P 500), vol-targeted</text>
+  <line x1="60" y1="460" x2="688" y2="460" stroke="#21262d"/>
+  <line x1="60" y1="300" x2="688" y2="300" stroke="#21262d" stroke-dasharray="3,4"/>
+  <text x="62" y="296" fill="#484f58" font-size="10">$408k</text>
+  <text x="62" y="474" fill="#484f58" font-size="10">$100k</text>
+  <polygon points="60,460 182,442.6 304,439.5 426,404.5 548,369 670,280 670,460 60,460" fill="#3fb950" fill-opacity="0.10"/>
+  <polyline points="60,460 182,442.6 304,439.5 426,404.5 548,369 670,280" fill="none" stroke="#3fb950" stroke-width="2.5"/>
+  <g fill="#3fb950">
+    <circle cx="60" cy="460" r="3"/><circle cx="182" cy="442.6" r="3"/><circle cx="304" cy="439.5" r="3"/>
+    <circle cx="426" cy="404.5" r="3"/><circle cx="548" cy="369" r="3"/><circle cx="670" cy="280" r="3.5"/>
+  </g>
+  <g fill="#484f58" font-size="10">
+    <text x="48" y="478">2016</text><text x="406" y="478">2022</text><text x="650" y="478">2026</text>
+  </g>
+
+  <!-- agent board -->
+  <rect x="720" y="216" width="368" height="276" rx="12" fill="#161b22" stroke="#30363d"/>
+  <text x="738" y="244" fill="#e6edf3" font-size="14" font-weight="600">AI agent pipeline</text>
+  <text x="738" y="262" fill="#8b949e" font-size="11">12 agents · research → build → validate → execute</text>
+  <g font-size="12">
+    <!-- active = green dot, ready = gray -->
+    <circle cx="744" cy="284" r="4" fill="#3fb950"/><text x="756" y="288" fill="#e6edf3">research_agent</text>
+    <circle cx="744" cy="306" r="4" fill="#3fb950"/><text x="756" y="310" fill="#e6edf3">autonomous_agent</text>
+    <circle cx="744" cy="328" r="4" fill="#3fb950"/><text x="756" y="332" fill="#e6edf3">ml_research_agent</text>
+    <circle cx="744" cy="350" r="4" fill="#3fb950"/><text x="756" y="354" fill="#e6edf3">code_agent</text>
+    <circle cx="744" cy="372" r="4" fill="#3fb950"/><text x="756" y="376" fill="#e6edf3">ml_code_agent</text>
+    <circle cx="744" cy="394" r="4" fill="#3fb950"/><text x="756" y="398" fill="#e6edf3">backtesting_agent</text>
+    <circle cx="744" cy="416" r="4" fill="#3fb950"/><text x="756" y="420" fill="#e6edf3">risk_agent</text>
+    <circle cx="744" cy="438" r="4" fill="#3fb950"/><text x="756" y="442" fill="#e6edf3">execution_agent</text>
+
+    <circle cx="940" cy="284" r="4" fill="#484f58"/><text x="952" y="288" fill="#8b949e">options_research</text>
+    <circle cx="940" cy="306" r="4" fill="#484f58"/><text x="952" y="310" fill="#8b949e">options_code</text>
+    <circle cx="940" cy="328" r="4" fill="#484f58"/><text x="952" y="332" fill="#8b949e">options_agent</text>
+    <circle cx="940" cy="350" r="4" fill="#484f58"/><text x="952" y="354" fill="#8b949e">monitor_agent</text>
+  </g>
+  <g font-size="10.5">
+    <circle cx="744" cy="466" r="4" fill="#3fb950"/><text x="756" y="470" fill="#8b949e">active</text>
+    <circle cx="812" cy="466" r="4" fill="#484f58"/><text x="824" y="470" fill="#8b949e">ready</text>
+  </g>
+
+  <text x="32" y="512" fill="#484f58" font-size="11">Live interactive dashboard in /docs (GitHub Pages) · passes risk gate · positive in all 5 walk-forward folds incl. 2022 bear</text>
+</svg>

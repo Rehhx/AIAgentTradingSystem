@@ -14,7 +14,8 @@ from typing import Optional
 
 
 def ask_claude(prompt: str, system_prompt: str, allowed_tools: Optional[list] = None,
-               model: Optional[str] = None, max_turns: int = 6) -> str:
+               model: Optional[str] = None, max_turns: int = 6,
+               debug_log_path: Optional[str] = None) -> str:
     """
     fire a one-shot query to claude via the agent sdk. returns the
     concatenated text of all assistant messages. raises ClaudeSDKError on
@@ -39,4 +40,11 @@ def ask_claude(prompt: str, system_prompt: str, allowed_tools: Optional[list] = 
                         parts.append(block.text)
         return "".join(parts)
 
-    return asyncio.run(_collect())
+    text = asyncio.run(_collect())
+    if debug_log_path:
+        try:
+            from pathlib import Path
+            Path(debug_log_path).write_text(text, encoding="utf-8")
+        except Exception:
+            pass
+    return text

@@ -1,0 +1,807 @@
+{
+  "generated_at": "2026-05-29",
+  "span": "2016-01-04 .. 2026-05-28",
+  "repo_url": "",
+  "headline": {
+    "name": "Ensemble + vol-target",
+    "sharpe": 1.441,
+    "cagr": 0.1451,
+    "max_drawdown": -0.1272,
+    "pnl_dollars": 308114.78,
+    "final_capital": 408114.78,
+    "wf_folds_positive": 5,
+    "wf_total": 5
+  },
+  "books": [
+    {
+      "name": "Ensemble + vol-target (DEPLOY)",
+      "sharpe": 1.441,
+      "cagr": 0.1451,
+      "max_drawdown": -0.1272,
+      "pnl_dollars": 308114.78,
+      "risk_pass": true,
+      "note": "all 4 passers, dual-momentum on S&P 500"
+    },
+    {
+      "name": "trend_5020 + vol-target",
+      "sharpe": 1.343,
+      "cagr": 0.1371,
+      "max_drawdown": -0.1267,
+      "pnl_dollars": 279333.89,
+      "risk_pass": true,
+      "note": "50/200 trend, de-risked"
+    },
+    {
+      "name": "RSI-2 + Donchian + trend (blended)",
+      "sharpe": 1.225,
+      "cagr": 0.0929,
+      "max_drawdown": -0.1183,
+      "pnl_dollars": 151392.07,
+      "risk_pass": true,
+      "note": "core-3 equal weight"
+    },
+    {
+      "name": "Donchian breakout",
+      "sharpe": 0.94,
+      "cagr": 0.0707,
+      "max_drawdown": -0.1276,
+      "pnl_dollars": 103171.8,
+      "risk_pass": true,
+      "note": "20/10 channel"
+    },
+    {
+      "name": "RSI-2 mean reversion",
+      "sharpe": 0.871,
+      "cagr": 0.0514,
+      "max_drawdown": -0.0899,
+      "pnl_dollars": 68222.71,
+      "risk_pass": true,
+      "note": "buy dips in uptrend"
+    }
+  ],
+  "equity": [
+    {
+      "date": "2016-01",
+      "strategy": 100000.0,
+      "spy": 96369.0
+    },
+    {
+      "date": "2016-02",
+      "strategy": 100018.0,
+      "spy": 96289.0
+    },
+    {
+      "date": "2016-03",
+      "strategy": 100770.0,
+      "spy": 102766.0
+    },
+    {
+      "date": "2016-04",
+      "strategy": 100587.0,
+      "spy": 103171.0
+    },
+    {
+      "date": "2016-05",
+      "strategy": 100915.0,
+      "spy": 104926.0
+    },
+    {
+      "date": "2016-06",
+      "strategy": 100875.0,
+      "spy": 105291.0
+    },
+    {
+      "date": "2016-07",
+      "strategy": 101676.0,
+      "spy": 109131.0
+    },
+    {
+      "date": "2016-08",
+      "strategy": 101768.0,
+      "spy": 109262.0
+    },
+    {
+      "date": "2016-09",
+      "strategy": 102116.0,
+      "spy": 109268.0
+    },
+    {
+      "date": "2016-10",
+      "strategy": 101821.0,
+      "spy": 107373.0
+    },
+    {
+      "date": "2016-11",
+      "strategy": 102855.0,
+      "spy": 111329.0
+    },
+    {
+      "date": "2016-12",
+      "strategy": 103770.0,
+      "spy": 113586.0
+    },
+    {
+      "date": "2017-01",
+      "strategy": 104648.0,
+      "spy": 115618.0
+    },
+    {
+      "date": "2017-02",
+      "strategy": 106163.0,
+      "spy": 120161.0
+    },
+    {
+      "date": "2017-03",
+      "strategy": 107378.0,
+      "spy": 120311.0
+    },
+    {
+      "date": "2017-04",
+      "strategy": 107826.0,
+      "spy": 121506.0
+    },
+    {
+      "date": "2017-05",
+      "strategy": 110686.0,
+      "spy": 123220.0
+    },
+    {
+      "date": "2017-06",
+      "strategy": 110602.0,
+      "spy": 124006.0
+    },
+    {
+      "date": "2017-07",
+      "strategy": 112531.0,
+      "spy": 126555.0
+    },
+    {
+      "date": "2017-08",
+      "strategy": 114865.0,
+      "spy": 126924.0
+    },
+    {
+      "date": "2017-09",
+      "strategy": 116449.0,
+      "spy": 129481.0
+    },
+    {
+      "date": "2017-10",
+      "strategy": 122060.0,
+      "spy": 132533.0
+    },
+    {
+      "date": "2017-11",
+      "strategy": 123852.0,
+      "spy": 136583.0
+    },
+    {
+      "date": "2017-12",
+      "strategy": 122706.0,
+      "spy": 138240.0
+    },
+    {
+      "date": "2018-01",
+      "strategy": 130423.0,
+      "spy": 146031.0
+    },
+    {
+      "date": "2018-02",
+      "strategy": 125932.0,
+      "spy": 140721.0
+    },
+    {
+      "date": "2018-03",
+      "strategy": 121806.0,
+      "spy": 136864.0
+    },
+    {
+      "date": "2018-04",
+      "strategy": 122237.0,
+      "spy": 137571.0
+    },
+    {
+      "date": "2018-05",
+      "strategy": 126427.0,
+      "spy": 140916.0
+    },
+    {
+      "date": "2018-06",
+      "strategy": 127589.0,
+      "spy": 141726.0
+    },
+    {
+      "date": "2018-07",
+      "strategy": 129742.0,
+      "spy": 146977.0
+    },
+    {
+      "date": "2018-08",
+      "strategy": 137963.0,
+      "spy": 151668.0
+    },
+    {
+      "date": "2018-09",
+      "strategy": 138766.0,
+      "spy": 152570.0
+    },
+    {
+      "date": "2018-10",
+      "strategy": 128220.0,
+      "spy": 142027.0
+    },
+    {
+      "date": "2018-11",
+      "strategy": 125898.0,
+      "spy": 144661.0
+    },
+    {
+      "date": "2018-12",
+      "strategy": 122029.0,
+      "spy": 131924.0
+    },
+    {
+      "date": "2019-01",
+      "strategy": 122564.0,
+      "spy": 142486.0
+    },
+    {
+      "date": "2019-02",
+      "strategy": 123262.0,
+      "spy": 147105.0
+    },
+    {
+      "date": "2019-03",
+      "strategy": 125485.0,
+      "spy": 149768.0
+    },
+    {
+      "date": "2019-04",
+      "strategy": 128343.0,
+      "spy": 155886.0
+    },
+    {
+      "date": "2019-05",
+      "strategy": 123702.0,
+      "spy": 145945.0
+    },
+    {
+      "date": "2019-06",
+      "strategy": 128041.0,
+      "spy": 156101.0
+    },
+    {
+      "date": "2019-07",
+      "strategy": 130644.0,
+      "spy": 158461.0
+    },
+    {
+      "date": "2019-08",
+      "strategy": 129901.0,
+      "spy": 155808.0
+    },
+    {
+      "date": "2019-09",
+      "strategy": 128447.0,
+      "spy": 158840.0
+    },
+    {
+      "date": "2019-10",
+      "strategy": 131012.0,
+      "spy": 162351.0
+    },
+    {
+      "date": "2019-11",
+      "strategy": 134785.0,
+      "spy": 168228.0
+    },
+    {
+      "date": "2019-12",
+      "strategy": 137940.0,
+      "spy": 173116.0
+    },
+    {
+      "date": "2020-01",
+      "strategy": 139242.0,
+      "spy": 173046.0
+    },
+    {
+      "date": "2020-02",
+      "strategy": 135058.0,
+      "spy": 159346.0
+    },
+    {
+      "date": "2020-03",
+      "strategy": 134222.0,
+      "spy": 139449.0
+    },
+    {
+      "date": "2020-04",
+      "strategy": 139383.0,
+      "spy": 157156.0
+    },
+    {
+      "date": "2020-05",
+      "strategy": 141451.0,
+      "spy": 164644.0
+    },
+    {
+      "date": "2020-06",
+      "strategy": 145006.0,
+      "spy": 167564.0
+    },
+    {
+      "date": "2020-07",
+      "strategy": 152408.0,
+      "spy": 177432.0
+    },
+    {
+      "date": "2020-08",
+      "strategy": 161282.0,
+      "spy": 189816.0
+    },
+    {
+      "date": "2020-09",
+      "strategy": 156410.0,
+      "spy": 182709.0
+    },
+    {
+      "date": "2020-10",
+      "strategy": 152215.0,
+      "spy": 178153.0
+    },
+    {
+      "date": "2020-11",
+      "strategy": 163110.0,
+      "spy": 197532.0
+    },
+    {
+      "date": "2020-12",
+      "strategy": 168120.0,
+      "spy": 204850.0
+    },
+    {
+      "date": "2021-01",
+      "strategy": 170764.0,
+      "spy": 202763.0
+    },
+    {
+      "date": "2021-02",
+      "strategy": 173469.0,
+      "spy": 208401.0
+    },
+    {
+      "date": "2021-03",
+      "strategy": 174477.0,
+      "spy": 217862.0
+    },
+    {
+      "date": "2021-04",
+      "strategy": 182170.0,
+      "spy": 229389.0
+    },
+    {
+      "date": "2021-05",
+      "strategy": 180846.0,
+      "spy": 230895.0
+    },
+    {
+      "date": "2021-06",
+      "strategy": 183984.0,
+      "spy": 236074.0
+    },
+    {
+      "date": "2021-07",
+      "strategy": 186396.0,
+      "spy": 241837.0
+    },
+    {
+      "date": "2021-08",
+      "strategy": 191328.0,
+      "spy": 249034.0
+    },
+    {
+      "date": "2021-09",
+      "strategy": 186695.0,
+      "spy": 237428.0
+    },
+    {
+      "date": "2021-10",
+      "strategy": 197264.0,
+      "spy": 254086.0
+    },
+    {
+      "date": "2021-11",
+      "strategy": 195850.0,
+      "spy": 252045.0
+    },
+    {
+      "date": "2021-12",
+      "strategy": 197402.0,
+      "spy": 263701.0
+    },
+    {
+      "date": "2022-01",
+      "strategy": 191217.0,
+      "spy": 249793.0
+    },
+    {
+      "date": "2022-02",
+      "strategy": 190324.0,
+      "spy": 242420.0
+    },
+    {
+      "date": "2022-03",
+      "strategy": 194128.0,
+      "spy": 251533.0
+    },
+    {
+      "date": "2022-04",
+      "strategy": 192889.0,
+      "spy": 229456.0
+    },
+    {
+      "date": "2022-05",
+      "strategy": 193531.0,
+      "spy": 229974.0
+    },
+    {
+      "date": "2022-06",
+      "strategy": 190364.0,
+      "spy": 211010.0
+    },
+    {
+      "date": "2022-07",
+      "strategy": 193609.0,
+      "spy": 230442.0
+    },
+    {
+      "date": "2022-08",
+      "strategy": 192672.0,
+      "spy": 221039.0
+    },
+    {
+      "date": "2022-09",
+      "strategy": 191399.0,
+      "spy": 200605.0
+    },
+    {
+      "date": "2022-10",
+      "strategy": 193409.0,
+      "spy": 216909.0
+    },
+    {
+      "date": "2022-11",
+      "strategy": 193850.0,
+      "spy": 228968.0
+    },
+    {
+      "date": "2022-12",
+      "strategy": 189948.0,
+      "spy": 215773.0
+    },
+    {
+      "date": "2023-01",
+      "strategy": 193628.0,
+      "spy": 229342.0
+    },
+    {
+      "date": "2023-02",
+      "strategy": 190382.0,
+      "spy": 223576.0
+    },
+    {
+      "date": "2023-03",
+      "strategy": 194830.0,
+      "spy": 231866.0
+    },
+    {
+      "date": "2023-04",
+      "strategy": 195677.0,
+      "spy": 235570.0
+    },
+    {
+      "date": "2023-05",
+      "strategy": 201781.0,
+      "spy": 236657.0
+    },
+    {
+      "date": "2023-06",
+      "strategy": 209329.0,
+      "spy": 251992.0
+    },
+    {
+      "date": "2023-07",
+      "strategy": 216917.0,
+      "spy": 260241.0
+    },
+    {
+      "date": "2023-08",
+      "strategy": 216985.0,
+      "spy": 256011.0
+    },
+    {
+      "date": "2023-09",
+      "strategy": 209879.0,
+      "spy": 243868.0
+    },
+    {
+      "date": "2023-10",
+      "strategy": 206347.0,
+      "spy": 238574.0
+    },
+    {
+      "date": "2023-11",
+      "strategy": 216128.0,
+      "spy": 260366.0
+    },
+    {
+      "date": "2023-12",
+      "strategy": 226159.0,
+      "spy": 272253.0
+    },
+    {
+      "date": "2024-01",
+      "strategy": 229887.0,
+      "spy": 276589.0
+    },
+    {
+      "date": "2024-02",
+      "strategy": 251573.0,
+      "spy": 291023.0
+    },
+    {
+      "date": "2024-03",
+      "strategy": 259477.0,
+      "spy": 300540.0
+    },
+    {
+      "date": "2024-04",
+      "strategy": 257607.0,
+      "spy": 288423.0
+    },
+    {
+      "date": "2024-05",
+      "strategy": 266189.0,
+      "spy": 303011.0
+    },
+    {
+      "date": "2024-06",
+      "strategy": 272064.0,
+      "spy": 313701.0
+    },
+    {
+      "date": "2024-07",
+      "strategy": 268933.0,
+      "spy": 317500.0
+    },
+    {
+      "date": "2024-08",
+      "strategy": 268337.0,
+      "spy": 324918.0
+    },
+    {
+      "date": "2024-09",
+      "strategy": 276139.0,
+      "spy": 331743.0
+    },
+    {
+      "date": "2024-10",
+      "strategy": 283088.0,
+      "spy": 328783.0
+    },
+    {
+      "date": "2024-11",
+      "strategy": 303921.0,
+      "spy": 348389.0
+    },
+    {
+      "date": "2024-12",
+      "strategy": 295835.0,
+      "spy": 340007.0
+    },
+    {
+      "date": "2025-01",
+      "strategy": 304630.0,
+      "spy": 349138.0
+    },
+    {
+      "date": "2025-02",
+      "strategy": 299360.0,
+      "spy": 344706.0
+    },
+    {
+      "date": "2025-03",
+      "strategy": 285388.0,
+      "spy": 325499.0
+    },
+    {
+      "date": "2025-04",
+      "strategy": 281857.0,
+      "spy": 322677.0
+    },
+    {
+      "date": "2025-05",
+      "strategy": 289764.0,
+      "spy": 342956.0
+    },
+    {
+      "date": "2025-06",
+      "strategy": 299250.0,
+      "spy": 360579.0
+    },
+    {
+      "date": "2025-07",
+      "strategy": 308451.0,
+      "spy": 368884.0
+    },
+    {
+      "date": "2025-08",
+      "strategy": 309885.0,
+      "spy": 376453.0
+    },
+    {
+      "date": "2025-09",
+      "strategy": 326209.0,
+      "spy": 389863.0
+    },
+    {
+      "date": "2025-10",
+      "strategy": 334416.0,
+      "spy": 399156.0
+    },
+    {
+      "date": "2025-11",
+      "strategy": 336454.0,
+      "spy": 399934.0
+    },
+    {
+      "date": "2025-12",
+      "strategy": 343499.0,
+      "spy": 400253.0
+    },
+    {
+      "date": "2026-01",
+      "strategy": 354104.0,
+      "spy": 406152.0
+    },
+    {
+      "date": "2026-02",
+      "strategy": 361285.0,
+      "spy": 402642.0
+    },
+    {
+      "date": "2026-03",
+      "strategy": 358320.0,
+      "spy": 382760.0
+    },
+    {
+      "date": "2026-04",
+      "strategy": 385487.0,
+      "spy": 422970.0
+    },
+    {
+      "date": "2026-05",
+      "strategy": 408115.0,
+      "spy": 444122.0
+    }
+  ],
+  "walk_forward": [
+    {
+      "period": "2016-01..2018-01",
+      "sharpe": 2.04,
+      "ret": 0.2979
+    },
+    {
+      "period": "2018-01..2020-02",
+      "sharpe": 0.239,
+      "ret": 0.0406
+    },
+    {
+      "period": "2020-03..2022-03",
+      "sharpe": 1.624,
+      "ret": 0.4438
+    },
+    {
+      "period": "2022-03..2024-04",
+      "sharpe": 1.536,
+      "ret": 0.3111
+    },
+    {
+      "period": "2024-04..2026-05",
+      "sharpe": 2.058,
+      "ret": 0.5963
+    }
+  ],
+  "agents": [
+    {
+      "name": "research_agent",
+      "layer": "research",
+      "role": "Discovers + invents equity strategies (web + first principles)",
+      "status": "active",
+      "detail": "2 outputs last run"
+    },
+    {
+      "name": "autonomous_agent",
+      "layer": "research",
+      "role": "Pure first-principles strategy invention",
+      "status": "active",
+      "detail": "1 outputs last run"
+    },
+    {
+      "name": "ml_research_agent",
+      "layer": "research",
+      "role": "Proposes daily ML/DL approaches",
+      "status": "active",
+      "detail": "1 outputs last run"
+    },
+    {
+      "name": "options_research_agent",
+      "layer": "research",
+      "role": "Options strategy ideas (verticals, condors, 0DTE)",
+      "status": "ready",
+      "detail": ""
+    },
+    {
+      "name": "code_agent",
+      "layer": "build",
+      "role": "Rule-based spec -> signals() module (validation-retry)",
+      "status": "active",
+      "detail": "26 rule strategies generated"
+    },
+    {
+      "name": "ml_code_agent",
+      "layer": "build",
+      "role": "ML spec -> train-in-signals module (validation-retry)",
+      "status": "active",
+      "detail": "15 ML strategies generated"
+    },
+    {
+      "name": "options_code_agent",
+      "layer": "build",
+      "role": "Options spec -> signals + intent module",
+      "status": "ready",
+      "detail": ""
+    },
+    {
+      "name": "backtesting_agent",
+      "layer": "validate",
+      "role": "$100k engine + walk-forward + regime + risk",
+      "status": "active",
+      "detail": "10 outputs last run"
+    },
+    {
+      "name": "risk_agent",
+      "layer": "validate",
+      "role": "Gates by Sharpe/DD/WR/trades thresholds",
+      "status": "active",
+      "detail": "10 outputs last run"
+    },
+    {
+      "name": "execution_agent",
+      "layer": "execute",
+      "role": "Alpaca paper orders (fractional + vol-target)",
+      "status": "ready",
+      "detail": ""
+    },
+    {
+      "name": "options_agent",
+      "layer": "execute",
+      "role": "Alpaca paper options orders",
+      "status": "ready",
+      "detail": ""
+    },
+    {
+      "name": "monitor_agent",
+      "layer": "execute",
+      "role": "Live PnL + concentration/drawdown alerts",
+      "status": "ready",
+      "detail": ""
+    }
+  ],
+  "ledger": {
+    "tried": 61,
+    "deployed": 4,
+    "dead": 57
+  }
+}

@@ -4,6 +4,20 @@ An autonomous multi-agent system that researches, validates, and paper-trades
 **daily / multi-day** quantitative trading strategies. Built on the Claude Agent
 SDK + Alpaca paper trading + free split/dividend-adjusted daily data (yfinance).
 
+![quant-agent dashboard — Sharpe 1.44, 14.5% CAGR, -12.7% max drawdown, 5/5 walk-forward folds, 12-agent pipeline](docs/dashboard-preview.svg)
+
+### 📊 Live dashboard
+
+An interactive dashboard (agent pipeline board, equity curve vs SPY, walk-forward,
+book metrics) lives in [`docs/`](docs/index.html) and is built for **GitHub Pages**:
+
+1. push the repo, then in **Settings → Pages** set *Source: Deploy from a branch*,
+   branch `main`, folder **`/docs`**;
+2. it goes live at `https://<you>.github.io/<repo>/`.
+
+Regenerate its data after a change with `python runners/build_dashboard_data.py`
+(writes `docs/data.json`), then commit `docs/`.
+
 > **The core finding of this project:** 1-minute intraday strategies do **not**
 > survive realistic costs (6 bps round-trip) — across 30+ strategies, loss
 > magnitude tracked trade count almost perfectly. The edge appears once you move

@@ -1,0 +1,185 @@
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>quant-agent — multi-agent daily trading system</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --border:#30363d;
+    --txt:#e6edf3; --muted:#8b949e; --accent:#2f81f7; --green:#3fb950;
+    --red:#f85149; --amber:#d29922; --purple:#a371f7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 64px}
+  header{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:28px}
+  h1{font-size:30px;font-weight:700;letter-spacing:-.5px}
+  .tag{color:var(--muted);font-size:15px;margin-top:6px;max-width:760px}
+  .pill{display:inline-block;font-size:12px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px 10px;margin-right:8px;margin-top:10px}
+  h2{font-size:15px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:36px 0 14px;font-weight:600}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+  .kpi .v{font-size:26px;font-weight:700}
+  .kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+  .green{color:var(--green)} .red{color:var(--red)} .amber{color:var(--amber)}
+  .cols{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:840px){.cols{grid-template-columns:repeat(2,1fr)}}
+  .col h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:10px;font-weight:700}
+  .agent{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:11px 12px;margin-bottom:10px;position:relative}
+  .agent .n{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:7px}
+  .agent .r{font-size:12px;color:var(--muted);margin-top:3px}
+  .agent .d{font-size:11.5px;color:var(--green);margin-top:5px}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+  .dot.active{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.ready{background:#484f58}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--border)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tr:last-child td{border-bottom:none}
+  .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+  .badge.pass{background:rgba(63,185,80,.15);color:var(--green)}
+  .badge.fail{background:rgba(248,81,73,.15);color:var(--red)}
+  .note{font-size:11.5px;color:var(--muted)}
+  .grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:20px}
+  @media(max-width:840px){.grid2{grid-template-columns:1fr}}
+  footer{margin-top:40px;border-top:1px solid var(--border);padding-top:20px;color:var(--muted);font-size:13px}
+  .links a{margin-right:18px}
+  code{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:12.5px}
+  .disclaimer{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:8px;padding:12px 14px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>quant-agent</h1>
+    <div class="tag">An autonomous multi-agent system that researches, validates, and paper-trades
+      <strong>daily / multi-day</strong> quantitative trading strategies — Claude Agent SDK + Alpaca paper + adjusted daily data.</div>
+    <div>
+      <span class="pill" id="pill-span">backtest 2016–2026</span>
+      <span class="pill">6 bps round-trip cost</span>
+      <span class="pill">walk-forward validated</span>
+      <span class="pill" id="pill-gen">generated —</span>
+    </div>
+  </header>
+
+  <h2>Deployable book — performance</h2>
+  <div class="kpis" id="kpis"></div>
+  <div class="disclaimer" id="disclaimer">Long-only equity book validated over a 2016–2026 bull market — not market-neutral.
+    Vol-targeting controls drawdown; paper-trade live before any real capital.</div>
+
+  <h2>AI agent pipeline</h2>
+  <div class="cols" id="agents"></div>
+
+  <h2>Equity curve vs S&amp;P 500 (SPY)</h2>
+  <div class="panel"><canvas id="equity" height="110"></canvas></div>
+
+  <div class="grid2">
+    <div>
+      <h2>Strategy books</h2>
+      <div class="panel" style="padding:6px 14px"><table id="books"></table></div>
+    </div>
+    <div>
+      <h2>Walk-forward (out-of-sample)</h2>
+      <div class="panel"><canvas id="wf" height="220"></canvas></div>
+      <div class="kpis" id="ledger" style="margin-top:14px;grid-template-columns:repeat(3,1fr)"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="links">
+      <a href="https://github.com/" id="repo-link">★ Repository</a>
+      <a href="../README.md">README</a>
+      <a href="../BOARD_SUMMARY.md">Findings (board summary)</a>
+      <a href="../LESSONS.md">Lessons</a>
+      <a href="../WALK_FORWARD_SETTINGS.md">Walk-forward</a>
+    </div>
+    <p style="margin-top:12px">Deploy: <code>python runners/daily_rebalance.py --book blended_plus --xs-universe sp500 --vol-target 0.12 --live</code></p>
+  </footer>
+</div>
+
+<script>
+const fmt$ = n => (n>=0?'+$':'-$') + Math.abs(Math.round(n)).toLocaleString();
+const pct = n => (n*100).toFixed(1) + '%';
+
+fetch('data.json').then(r=>r.json()).then(d=>{
+  document.getElementById('pill-gen').textContent = 'generated ' + d.generated_at;
+  document.getElementById('pill-span').textContent = 'backtest ' + d.span;
+
+  // wire footer links to the repo if repo_url is set (so they resolve on Pages)
+  if (d.repo_url){
+    const base = d.repo_url.replace(/\/$/,'');
+    document.getElementById('repo-link').href = base;
+    document.querySelectorAll('.links a[href^="../"]').forEach(a=>{
+      a.href = base + '/blob/main/' + a.getAttribute('href').replace('../','');
+    });
+  }
+
+  // KPIs
+  const h = d.headline;
+  const kpis = [
+    {v:h.sharpe.toFixed(2), l:'Sharpe ratio', c:'green'},
+    {v:pct(h.cagr), l:'CAGR', c:'green'},
+    {v:pct(h.max_drawdown), l:'Max drawdown', c:'amber'},
+    {v:fmt$(h.pnl_dollars), l:'P&L on $100k', c:'green'},
+    {v:h.wf_folds_positive+'/'+h.wf_total, l:'Walk-forward folds +', c:'green'},
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k=>
+    `<div class="kpi"><div class="v ${k.c}">${k.v}</div><div class="l">${k.l}</div></div>`).join('');
+
+  // agent board grouped by layer
+  const layers = {research:'Research', build:'Build', validate:'Validate', execute:'Execute'};
+  document.getElementById('agents').innerHTML = Object.keys(layers).map(L=>{
+    const items = d.agents.filter(a=>a.layer===L).map(a=>
+      `<div class="agent"><div class="n"><span class="dot ${a.status}"></span>${a.name}</div>
+       <div class="r">${a.role}</div>${a.detail?`<div class="d">▸ ${a.detail}</div>`:''}</div>`).join('');
+    return `<div class="col"><h3>${layers[L]}</h3>${items}</div>`;
+  }).join('');
+
+  // books table
+  const rows = d.books.map(b=>`<tr>
+    <td>${b.name}<div class="note">${b.note||''}</div></td>
+    <td>${b.sharpe.toFixed(2)}</td>
+    <td class="green">${fmt$(b.pnl_dollars)}</td>
+    <td>${pct(b.cagr)}</td>
+    <td class="${b.max_drawdown<-0.15?'red':'amber'}">${pct(b.max_drawdown)}</td>
+    <td><span class="badge ${b.risk_pass?'pass':'fail'}">${b.risk_pass?'PASS':'FAIL'}</span></td></tr>`).join('');
+  document.getElementById('books').innerHTML =
+    `<tr><th>Book</th><th>Sharpe</th><th>P&L</th><th>CAGR</th><th>Max DD</th><th>Risk</th></tr>`+rows;
+
+  // ledger stats
+  document.getElementById('ledger').innerHTML = [
+    {v:d.ledger.tried, l:'Strategies tried'},
+    {v:d.ledger.deployed, l:'Deployed/kept'},
+    {v:d.ledger.dead, l:'Ruled out'},
+  ].map(k=>`<div class="kpi"><div class="v">${k.v}</div><div class="l">${k.l}</div></div>`).join('');
+
+  // equity chart
+  new Chart(document.getElementById('equity'),{type:'line',
+    data:{labels:d.equity.map(p=>p.date),datasets:[
+      {label:'Ensemble strategy',data:d.equity.map(p=>p.strategy),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,.08)',fill:true,pointRadius:0,borderWidth:2,tension:.15},
+      {label:'SPY buy & hold',data:d.equity.map(p=>p.spy),borderColor:'#8b949e',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:.15},
+    ]},
+    options:{responsive:true,plugins:{legend:{labels:{color:'#e6edf3'}}},
+      scales:{x:{ticks:{color:'#8b949e',maxTicksLimit:10},grid:{color:'#21262d'}},
+        y:{ticks:{color:'#8b949e',callback:v=>'$'+(v/1000)+'k'},grid:{color:'#21262d'}}}}});
+
+  // walk-forward bars
+  new Chart(document.getElementById('wf'),{type:'bar',
+    data:{labels:d.walk_forward.map(f=>f.period),datasets:[
+      {label:'Out-of-sample Sharpe',data:d.walk_forward.map(f=>f.sharpe),
+       backgroundColor:d.walk_forward.map(f=>f.sharpe>=0?'#3fb950':'#f85149')}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#8b949e'},grid:{color:'#21262d'}},
+        y:{ticks:{color:'#8b949e'},grid:{display:false}}}}});
+}).catch(e=>{
+  document.getElementById('kpis').innerHTML =
+    '<div class="kpi"><div class="v amber">data.json not loaded</div><div class="l">serve via GitHub Pages or a local web server (fetch is blocked on file://)</div></div>';
+});
+</script>
+</body>
+</html>
