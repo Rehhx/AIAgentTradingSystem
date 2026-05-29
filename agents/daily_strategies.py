@@ -259,11 +259,36 @@ def sig_capitulation(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
     return _state_machine(enter, exit_, c.index)
 
 
+def sig_pead(d: pd.DataFrame, params: dict | None = None) -> pd.Series:
+    """Post-Earnings-Announcement Drift (price-proxy). An earnings BEAT shows up
+    as a large up-gap on a volume spike; the stock then drifts up for weeks. So:
+    detect (1-day return > gap_pct) AND (volume > vol_mult x its 20d average) as
+    the 'beat' event, then hold long for `hold_days` to ride the drift. Event-
+    driven and largely uncorrelated to continuous price factors. Long/flat."""
+    p = params or {}
+    gap_pct  = p.get("gap_pct", 0.05)
+    vol_mult = p.get("vol_mult", 2.0)
+    hold     = int(p.get("hold_days", 40))
+    c, v = d["close"], d["volume"]
+    ret = c.pct_change()
+    event = ((ret > gap_pct) & (v > v.rolling(20).mean() * vol_mult)).to_numpy()
+    pos = np.zeros(len(c))
+    left = 0
+    for i in range(len(c)):
+        if event[i]:
+            left = hold                     # (re)start the drift-hold window on a fresh beat
+        if left > 0:
+            pos[i] = 1.0
+            left -= 1
+    return pd.Series(pos, index=c.index, dtype=float)
+
+
 CANDIDATE_STRATEGIES = {
     "turn_of_month": sig_turn_of_month,
     "zscore_revert": sig_zscore_revert,
     "abs_momentum":  sig_abs_momentum,
     "capitulation":  sig_capitulation,
+    "pead":          sig_pead,
 }
 
 

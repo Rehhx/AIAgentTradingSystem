@@ -63,7 +63,12 @@ BOOKS = {
     # AGGRESSIVE growth book — leverage is OPT-IN via --max-leverage (default 1.0
     # = regime tilting, no leverage). With --max-leverage 1.5: ~20% CAGR, ~-18% DD.
     "regime_adaptive": {"_regime": 1.0},
+    # pead: post-earnings-drift — scans the full S&P 500 for earnings-gap beats,
+    # holds each for its 60-day drift window (event-driven; auto buy/hold/sell).
+    "pead": {"pead": 1.0},
 }
+
+PEAD_PARAMS = {"gap_pct": 0.05, "vol_mult": 2.0, "hold_days": 60}
 
 # per-regime (per-ticker sleeve weights, xs_dualmom alloc, leverage)
 REGIME_WEIGHTS = {
@@ -131,6 +136,7 @@ def target_weights(book: str, universe: list, source: str = "auto",
     else:
         strat_weights = dict(BOOKS[book])    # {strategy: capital weight}
         xs_alloc = strat_weights.pop("xs_dualmom", 0.0)
+    pead_alloc = strat_weights.pop("pead", 0.0)
     n = len(universe)
     weights = {t: 0.0 for t in universe}
     last_price, detail, closes = {}, {t: [] for t in universe}, {}
@@ -178,6 +184,28 @@ def target_weights(book: str, universe: list, source: str = "auto",
                 if t not in last_price:
                     last_price[t] = float(rank_closes[t].iloc[-1])
                     closes[t] = rank_closes[t]
+
+    # PEAD sleeve: scan the full S&P 500, hold every name currently inside its
+    # post-earnings drift window, equal-weight. Reconciler buys fresh beats and
+    # sells names whose window has expired.
+    if pead_alloc > 0:
+        from data.sp500 import sp500_tickers
+        active = []
+        for t in sp500_tickers():
+            try:
+                d = daily_bars(t)
+            except Exception:
+                continue
+            if len(d) > 80 and float(ALL_SIGNALS["pead"](d, PEAD_PARAMS).iloc[-1]) > 0:
+                active.append((t, float(d["close"].iloc[-1])))
+        if active:
+            per = pead_alloc / len(active)
+            for t, px in active:
+                weights[t] = weights.get(t, 0.0) + per
+                detail.setdefault(t, []).append("pead")
+                if t not in last_price:
+                    last_price[t] = px
+            print(f"  [pead] {len(active)} names in post-earnings drift window")
 
     # regime_adaptive: bear -> defensive gold+cash; else apply conditional leverage
     if book == "regime_adaptive":
