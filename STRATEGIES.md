@@ -9,16 +9,22 @@ win-rate ≥ 45%, trades ≥ 50. Code: `agents/daily_strategies.py`; execution:
 
 ## Deployed book: `portfolio_full`
 
-6 sleeves + 3 overlays. **Sharpe 1.48 · CAGR 16.3% · max DD −11.7% · 2018–2020 +8.4% · positive in 5/5 walk-forward folds.**
+6 sleeves + 3 overlays. **Sharpe 1.46 · CAGR 18.2% · max DD −13.1% · 2018–2020 +9% · positive in 5/5 walk-forward folds.**
 
 ```
 sleeve weights:  rsi2_meanrev 0.28 · donchian 0.22 · trend_5020 0.14
                  xs_dualmom 0.08 · recovery 0.18 · pead 0.10
-overlays:        vol-target 15% (≤1.6× leverage) · idle cash → BIL T-bills
+overlays:        vol-target 17% (≤1.8× leverage) · idle cash → BIL T-bills
                  · early-warning de-risk
 deploy:  python runners\daily_rebalance.py --book portfolio_full \
-              --xs-universe sp500 --vol-target 0.15 --max-leverage 1.6 --live
+              --xs-universe sp500 --vol-target 0.17 --max-leverage 1.8 --live
 ```
+
+Leverage note: the 1.8× cap (raised from 1.6×) deploys the risk budget the
+early-warning overlay freed up — it only levers that high when realized vol is
+low, and de-levers (vol-target) + cuts to 60% (early-warning) when vol spikes.
+The −13.1% backtest DD already includes the COVID-2020 crash and the 2022 bear.
+Residual risk: an unprecedented one-day gap hurts ~1.8× as much.
 
 ---
 
@@ -50,7 +56,7 @@ deploy:  python runners\daily_rebalance.py --book portfolio_full \
 
 | Book | Weights | Sharpe / CAGR / DD | Use |
 |---|---|---|---|
-| **`portfolio_full`** ⭐ | rsi .28, don .22, trd .14, xs .08, rec .18, pead .10 | 1.48 / 16.3% / −11.7% | **deployed** — best all-round |
+| **`portfolio_full`** ⭐ | rsi .28, don .22, trd .14, xs .08, rec .18, pead .10 | 1.46 / 18.2% / −13.1% | **deployed** @ vt 17% / 1.8× — best all-round |
 | `portfolio_rec` | rsi .32, don .24, trd .16, xs .08, rec .20 | 1.43 / 17.1% / −14.1% | max lean-year capture |
 | `portfolio_div` | rsi .35, don .27, trd .15, xs .08, pead .15 | 1.47 / 16.0% / −12.3% | smoothing via PEAD |
 | `portfolio` | risk-parity rsi .41, don .32, trd .18, xs .09 | 1.39 / 16.2% / −13.0% | core risk-parity |
