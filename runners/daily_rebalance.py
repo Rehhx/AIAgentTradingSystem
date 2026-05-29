@@ -113,7 +113,7 @@ XS_LOOKBACK, XS_SKIP, XS_MKT, XS_SMA = 252, 21, "SPY", 200
 
 def target_weights(book: str, universe: list, source: str = "auto",
                    xs_universe: str = "same", vol_target_pct: float = 0.0,
-                   max_lev: float = 1.0) -> tuple[dict, dict, dict]:
+                   max_lev: float = 1.0, park_cash: str = "BIL") -> tuple[dict, dict, dict]:
     """returns (weights, last_price, detail). Per-ticker sleeves give each long
     name alloc/N. The 'xs_dualmom' sleeve ranks a (possibly larger) universe by
     12-1 momentum and gives the top-K names alloc/K (cash when SPY < its 200d
@@ -203,6 +203,21 @@ def target_weights(book: str, universe: list, source: str = "auto",
             weights = {t: w * scale for t, w in weights.items()}
             print(f"  [vol-target {vol_target_pct:.0%}] recent vol {rv:.0%} "
                   f"-> exposure scale {scale:.2f}x")
+
+    # park idle cash in a T-bill ETF so uninvested capital earns ~yield, not 0%.
+    # Self-reinforcing for lean years: defensive periods hold more cash -> more yield.
+    if park_cash:
+        invested = sum(w for w in weights.values() if w > 0)
+        idle = round(1.0 - invested, 4)
+        if idle > 0.01:
+            try:
+                weights[park_cash] = weights.get(park_cash, 0.0) + idle
+                detail.setdefault(park_cash, []).append("cash_yield")
+                if park_cash not in last_price:
+                    last_price[park_cash] = float(fetch_daily(park_cash, source=source)["close"].iloc[-1])
+                print(f"  [cash-yield] parking {idle:.0%} idle cash in {park_cash} (T-bill yield)")
+            except Exception as e:
+                print(f"  [warn] could not park cash in {park_cash}: {e}")
     return weights, last_price, detail
 
 
@@ -241,6 +256,8 @@ def main():
                     help="use integer shares (default: fractional/notional dollar orders)")
     ap.add_argument("--min-order", type=float, default=250.0,
                     help="no-trade band: skip reconciling orders smaller than $X")
+    ap.add_argument("--park-cash", default="BIL",
+                    help="park idle cash in this T-bill ETF for yield ('' to disable)")
     args = ap.parse_args()
 
     if args.universe.strip().lower() == "quality":
@@ -259,7 +276,8 @@ def main():
 
     weights, last_price, detail = target_weights(
         args.book, universe, args.source, xs_universe=args.xs_universe,
-        vol_target_pct=args.vol_target, max_lev=args.max_leverage)
+        vol_target_pct=args.vol_target, max_lev=args.max_leverage,
+        park_cash=(args.park_cash.strip().upper() or None))
     equity, esrc = get_equity(agent, args.notional)
     held = current_positions(agent)
 

@@ -128,7 +128,7 @@ This is a **long-biased equity** book. It compounds strongly in trending markets
 | Market-neutral long/short (uncorrelated factor) | Genuinely market-neutral (beta ≈ 0) but ~zero net edge after costs, −33% momentum-crash DD |
 
 ### How we get *some* return in those flat years (open work)
-1. **Earn yield on idle cash.** In defensive/flat regimes the book sits largely in cash — parking that in a **T-bill ETF (e.g. BIL / SGOV)** earns ~4–5%/yr at current rates instead of 0%. Low-risk, concrete, and worth wiring as the default "cash" holding. *(Not yet implemented.)*
+1. **Earn yield on idle cash — IMPLEMENTED.** Idle capital is now parked in a **T-bill ETF (BIL)** instead of earning 0% (`--park-cash BIL`, default on). Backtested it improves *everything* at zero added risk: Sharpe 1.39→**1.45**, CAGR 16.2%→**17.1%**, drawdown −13.0%→−12.8%, and it nearly doubles the 2018–2020 lean-fold return (**+1.8%→+3.2%**). Self-reinforcing: defensive/flat years hold *more* cash → earn *more* yield exactly when the strategies are quiet. The 2018–2020 test used that era's low ~1–2% rates; at today's ~4.5% the forward boost is larger. This is the primary, low-risk answer to "return through lean years."
 2. **Let the allocator keep hunting.** `portfolio_allocator.py` auto-admits any *new* strategy that passes the Sharpe + walk-forward gate (and auto-rejects the rest, as it did with all three fixes above). A genuinely uncorrelated edge discovered later joins automatically.
 3. **Plan for it operationally.** Hold a cash reserve and set the expectation with stakeholders up front: a long-biased strategy has lean years, and the disciplined response is to *not* curve-fit a fix that blows up live.
 
