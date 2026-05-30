@@ -209,6 +209,22 @@ quality-filtering momentum CUT return 47.6%→15.3% and Sharpe 1.33→0.97 — t
 momentum winners *are* the volatile names, so the screen removes the engine. Not
 wired to the live book. The fundamental screen remains a live inspection tool only.
 
+## Two-account deployment
+
+| Account | Book | Profile | Run |
+|---|---|---|---|
+| **#1 — Growth** | `portfolio_full` + 5% crypto | long equity, 21.8% CAGR / Sharpe 1.69 / −13.7% DD; loses in market crashes | `run_rebalance.ps1` (`--account 1`) |
+| **#2 — Crisis-alpha** | `managed_futures` | long/SHORT trend (CTA) across 10 asset ETFs, vol-targeted; **profits when equities fall** (2022 +6.5% vs S&P −18%) | `run_rebalance_acct2.ps1` (`--account 2 --whole-shares`) |
+
+The managed-futures book (`runners/managed_futures.py`) is the diversified
+time-series-momentum program that made CTAs (AQR, Man AHL, Aspect) their money in
+2018/2022. **Standalone it is weak** (CAGR ~1.5%, Sharpe ~0.2, −26% DD over
+2016–2026 — a poor decade for trend ex-2022): it is *crisis insurance*, choppy in
+calm bulls but positive in macro bears. Its value is running it **alongside** the
+equity book — when account 1 is down (2022), account 2 is up, smoothing the
+combined result. Requires **shorting + margin** on the Alpaca account (whole-share
+orders; no fractional shorts). Second account keys: `ALPACA_API_KEY_2/SECRET_2`.
+
 ## Honest caveats
 Long-biased equity book, validated 2016–2026 (one decade, one out-of-sample window).
 Not market-neutral; lean years (2018-style) are cushioned by cash yield + recovery

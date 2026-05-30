@@ -83,7 +83,15 @@ BOOKS = {
     "portfolio_full": {"rsi2_meanrev": 0.252, "donchian": 0.198, "trend_5020": 0.126,
                        "xs_dualmom": 0.072, "recovery": 0.162, "pead": 0.090,
                        "lowvol_def": 0.10},
+    # managed_futures: standalone long/SHORT trend (CTA) book for ACCOUNT 2 -- crisis
+    # alpha. Diversified time-series momentum across 10 asset ETFs, vol-targeted.
+    # Profits in macro bears (2022 +6.5% vs S&P -18%); choppy in calm bulls. REQUIRES
+    # shorting + margin on the Alpaca account; uses whole-share orders (no fractional
+    # shorts). Run on account 2: --book managed_futures --account 2 --whole-shares
+    "managed_futures": {"_mf": 1.0},
 }
+
+MF_MARKETS = ["SPY", "QQQ", "EFA", "EEM", "TLT", "IEF", "GLD", "DBC", "UUP", "VNQ"]
 
 PEAD_PARAMS = {"gap_pct": 0.05, "vol_mult": 2.0, "hold_days": 60}
 
@@ -156,6 +164,36 @@ XS_LOOKBACK, XS_SKIP, XS_MKT, XS_SMA = 252, 21, "SPY", 200
 LOWVOL_K, LOWVOL_VOLWIN = 30, 60          # defensive low-vol sleeve: 30 lowest 60d-vol names
 
 
+def _managed_futures_weights(source, target_vol, max_lev):
+    """today's SIGNED weights for the managed-futures (L/S trend) book: diversified
+    time-series momentum (avg sign of 1/3/12-mo returns), inverse-vol risk weighted,
+    vol-targeted. Returns (weights, last_price, detail) with negative weights = shorts."""
+    closes, last_price = {}, {}
+    for t in MF_MARKETS:
+        try:
+            c = fetch_daily(t, source=source)["close"]
+            if len(c) > 300:
+                closes[t] = c
+                last_price[t] = float(c.iloc[-1])
+        except Exception as e:
+            print(f"  [mf] skip {t}: {e}")
+    C = pd.DataFrame(closes).sort_index()
+    R = C.pct_change()
+    sig = (np.sign(C / C.shift(21) - 1) + np.sign(C / C.shift(63) - 1) + np.sign(C / C.shift(252) - 1)) / 3.0
+    vol = R.rolling(60).std()
+    raw = sig / vol
+    Wg = raw.div(raw.abs().sum(axis=1).replace(0, np.nan), axis=0)      # gross ~1 each day
+    port = (Wg.shift(1) * R).sum(axis=1)
+    rv = float(port.tail(20).std() * np.sqrt(252))
+    scale = min(max_lev, target_vol / rv) if rv > 0 else 1.0
+    today = (Wg.iloc[-1] * scale).dropna()
+    weights = {t: float(today[t]) for t in today.index if abs(today[t]) > 1e-4}
+    detail = {t: [("mf_short" if w < 0 else "mf_long")] for t, w in weights.items()}
+    print(f"  [managed-futures] {len(weights)} positions | vol-target {target_vol:.0%} "
+          f"-> leverage {scale:.2f}x | gross {sum(abs(w) for w in weights.values()):.0%}")
+    return weights, last_price, detail
+
+
 def target_weights(book: str, universe: list, source: str = "auto",
                    xs_universe: str = "same", vol_target_pct: float = 0.0,
                    max_lev: float = 1.0, park_cash: str = "BIL",
@@ -165,6 +203,10 @@ def target_weights(book: str, universe: list, source: str = "auto",
     name alloc/N. The 'xs_dualmom' sleeve ranks a (possibly larger) universe by
     12-1 momentum and gives the top-K names alloc/K (cash when SPY < its 200d
     SMA). vol_target_pct>0 scales the whole book to that annualized vol."""
+    if book == "managed_futures":
+        return _managed_futures_weights(source, vol_target_pct or 0.12,
+                                        max_lev if max_lev > 1.0 else 1.5)
+
     leverage, bear = 1.0, False
     if book == "regime_adaptive":
         regime = _detect_regime(source)
@@ -471,7 +513,11 @@ def main():
 
     print(f"Account equity: ${equity:,.0f} (source: {esrc})")
     invested = sum(weights.values())
-    print(f"Target invested: {invested:.0%} | cash: {max(0, 1 - invested):.0%}\n")
+    gross = sum(abs(w) for w in weights.values())
+    if gross > invested + 1e-9:                 # book has shorts (e.g. managed_futures)
+        print(f"Net exposure: {invested:+.0%} | gross (long+short): {gross:.0%}\n")
+    else:
+        print(f"Target invested: {invested:.0%} | cash: {max(0, 1 - invested):.0%}\n")
 
     sizing = "whole-share" if args.whole_shares else "fractional (notional $)"
     print(f"Sizing: {sizing} | no-trade band: ${args.min_order:,.0f}\n")
@@ -483,15 +529,16 @@ def main():
     orders = []
     # trade every name with a target weight (incl. cross-sectional picks outside
     # the base universe) plus anything currently held
-    trade_set = sorted(set(t for t, w in weights.items() if w > 0) | set(held))
+    trade_set = sorted(set(t for t, w in weights.items() if abs(w) > 1e-9) | set(held))
     for t in trade_set:
         w = weights.get(t, 0.0)
         cur_sh = float(held.get(t, 0))
         if t not in last_price:
-            if cur_sh != 0:                       # held, no price -> liquidate by qty
+            if cur_sh != 0:                       # held, no price -> close by qty (cover if short)
+                side = "sell" if cur_sh > 0 else "buy"
                 print(f"{t:7s} {'(exit, no price)':28s} {0:6.1%} {'-':>9s} "
-                      f"{'-':>9s} {'-':>9s} {'exit':>9s} {'SELL':>6s}")
-                orders.append({"ticker": t, "side": "sell", "qty": abs(cur_sh)})
+                      f"{'-':>9s} {'-':>9s} {'exit':>9s} {side.upper():>6s}")
+                orders.append({"ticker": t, "side": side, "qty": abs(cur_sh)})
             continue
         px = last_price[t]
         tgt_dollar = w * equity
@@ -499,12 +546,12 @@ def main():
         delta_dollar = tgt_dollar - cur_dollar
         sigs = ",".join(detail.get(t, [])) if detail.get(t) else "(flat)"
 
-        if w <= 0 and cur_sh > 0:                 # full exit -> sell the whole position
-            action = "SELL"
-            orders.append({"ticker": t, "side": "sell", "qty": abs(cur_sh)})
+        if abs(w) < 1e-9 and cur_sh != 0:         # target flat -> close long OR short
+            action = "SELL" if cur_sh > 0 else "BUY"
+            orders.append({"ticker": t, "side": action.lower(), "qty": abs(cur_sh)})
         elif abs(delta_dollar) >= args.min_order:
             action = "BUY" if delta_dollar > 0 else "SELL"
-            if args.whole_shares:
+            if args.whole_shares or w < 0 or cur_sh < 0:   # shorts: whole-share only (no fractional)
                 qty = abs(int(delta_dollar / px))
                 if qty > 0:
                     orders.append({"ticker": t, "side": action.lower(), "qty": qty})

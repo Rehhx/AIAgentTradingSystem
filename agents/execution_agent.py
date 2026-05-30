@@ -46,8 +46,10 @@ class ExecutionAgent:
         self.simulated = False
         self.log      = logging.getLogger("execution_agent")
 
-        key    = api_key or ALPACA_API_KEY          # default = account 1; pass keys for account 2
-        secret = api_secret or ALPACA_API_SECRET
+        # None => use config (account 1). An explicit "" (e.g. unset account-2 keys)
+        # must NOT silently fall back to account 1 -> go simulated instead.
+        key    = ALPACA_API_KEY if api_key is None else api_key
+        secret = ALPACA_API_SECRET if api_secret is None else api_secret
         if not key or not secret:
             self.log.warning("ALPACA creds missing — running in SIMULATED mode")
             self.simulated = True
