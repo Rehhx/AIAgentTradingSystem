@@ -45,18 +45,22 @@ def mf_returns(target_vol=0.12, max_lev=2.0):
     vol = R.rolling(60).std()
     raw = sig / vol
     w = raw.div(raw.abs().sum(axis=1).replace(0, np.nan), axis=0)      # gross exposure ~1
-    port = (w.shift(1) * R).sum(axis=1)
     turn = w.diff().abs().sum(axis=1).fillna(0)
-    port = (port - turn * RT_COST).fillna(0)
-    rv = port.rolling(20).std() * np.sqrt(TRADING_DAYS)
+    core = (w.shift(1) * R).sum(axis=1) - turn * RT_COST
+    # trend-conviction scaling: cut exposure in choppy/no-trend regimes (e.g. 2018),
+    # park the rest in T-bills -> dodges whipsaw losses while keeping crisis trends (2022)
+    conv = sig.abs().mean(axis=1).clip(0, 1).shift(1).fillna(0.0)
+    bil = daily_bars("BIL")["close"].pct_change().reindex(C.index).fillna(0.0)
+    blended = core * conv + (1 - conv) * bil
+    rv = blended.rolling(20).std() * np.sqrt(TRADING_DAYS)
     scale = (target_vol / rv.replace(0, np.nan)).clip(upper=max_lev).shift(1).fillna(0.0)
-    return (port * scale).fillna(0), w
+    return (blended * scale).fillna(0), w.mul(conv, axis=0)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-vol", type=float, default=0.12)
-    ap.add_argument("--max-lev", type=float, default=2.0)
+    ap.add_argument("--max-lev", type=float, default=1.5)   # matches the deployed account-2 config
     args = ap.parse_args()
 
     print(f"building managed-futures book ({len(MARKETS)} markets, vol-target {args.target_vol:.0%}, cap {args.max_lev}x) ...\n")

@@ -32,7 +32,7 @@ import pandas as pd
 
 from agents.daily_strategies import (
     STRATEGIES_DAILY, CANDIDATE_STRATEGIES, DEPLOY_PARAMS,
-    DEFAULT_UNIVERSE, QUALITY_UNIVERSE, daily_bars,
+    DEFAULT_UNIVERSE, QUALITY_UNIVERSE, daily_bars, RT_COST,
 )
 from agents.execution_agent import ExecutionAgent
 
@@ -183,14 +183,25 @@ def _managed_futures_weights(source, target_vol, max_lev):
     vol = R.rolling(60).std()
     raw = sig / vol
     Wg = raw.div(raw.abs().sum(axis=1).replace(0, np.nan), axis=0)      # gross ~1 each day
-    port = (Wg.shift(1) * R).sum(axis=1)
-    rv = float(port.tail(20).std() * np.sqrt(252))
+    turn = Wg.diff().abs().sum(axis=1).fillna(0)
+    core = (Wg.shift(1) * R).sum(axis=1) - turn * RT_COST
+    # trend-conviction scaling: cut gross exposure in choppy/no-trend regimes (2018),
+    # rest sits in cash/T-bills -> dodges whipsaw losses, keeps crisis trends (2022)
+    conv = sig.abs().mean(axis=1).clip(0, 1)
+    try:
+        bil = fetch_daily("BIL", source=source)["close"].pct_change().reindex(C.index).fillna(0.0)
+    except Exception:
+        bil = pd.Series(0.0, index=C.index)
+    cv = conv.shift(1).fillna(0.0)
+    blended = core * cv + (1 - cv) * bil
+    rv = float(blended.tail(20).std() * np.sqrt(252))
     scale = min(max_lev, target_vol / rv) if rv > 0 else 1.0
-    today = (Wg.iloc[-1] * scale).dropna()
+    conv_today = float(conv.iloc[-1])
+    today = (Wg.iloc[-1] * conv_today * scale).dropna()
     weights = {t: float(today[t]) for t in today.index if abs(today[t]) > 1e-4}
     detail = {t: [("mf_short" if w < 0 else "mf_long")] for t, w in weights.items()}
-    print(f"  [managed-futures] {len(weights)} positions | vol-target {target_vol:.0%} "
-          f"-> leverage {scale:.2f}x | gross {sum(abs(w) for w in weights.values()):.0%}")
+    print(f"  [managed-futures] {len(weights)} positions | conviction {conv_today:.0%} x "
+          f"vol-target {target_vol:.0%} -> gross {sum(abs(w) for w in weights.values()):.0%}")
     return weights, last_price, detail
 
 
