@@ -202,6 +202,13 @@ the expensive, fragile ones like a P/E-346 momentum chaser).
 
 Run: `python runners\fundamental_screen.py` (default: quality-10 + live momentum picks).
 
+**Wiring tested & SKIPPED:** the fundamental filter can't be backtested (no free
+point-in-time data), so the concept was tested with a backtestable quality proxy
+(low realized vol) on the momentum sleeve (`runners/quality_momentum_test.py`):
+quality-filtering momentum CUT return 47.6%→15.3% and Sharpe 1.33→0.97 — the biggest
+momentum winners *are* the volatile names, so the screen removes the engine. Not
+wired to the live book. The fundamental screen remains a live inspection tool only.
+
 ## Honest caveats
 Long-biased equity book, validated 2016–2026 (one decade, one out-of-sample window).
 Not market-neutral; lean years (2018-style) are cushioned by cash yield + recovery
