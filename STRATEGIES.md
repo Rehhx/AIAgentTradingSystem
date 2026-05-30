@@ -9,11 +9,12 @@ win-rate ≥ 45%, trades ≥ 50. Code: `agents/daily_strategies.py`; execution:
 
 ## Deployed book: `portfolio_full`
 
-6 sleeves + 3 overlays. **Sharpe 1.46 · CAGR 18.2% · max DD −13.1% · 2018–2020 +9% · positive in 5/5 walk-forward folds.**
+7 sleeves + 3 overlays. **Sharpe 1.53 · CAGR 18.4% · max DD −13.4% · 2018–2020 +9% · positive in 5/5 walk-forward folds.**
 
 ```
-sleeve weights:  rsi2_meanrev 0.28 · donchian 0.22 · trend_5020 0.14
-                 xs_dualmom 0.08 · recovery 0.18 · pead 0.10
+sleeve weights:  rsi2_meanrev 0.252 · donchian 0.198 · trend_5020 0.126
+                 xs_dualmom 0.072 · recovery 0.162 · pead 0.090
+                 lowvol_def 0.10   (six price sleeves scaled to 90%, lowvol 10%)
 overlays:        vol-target 17% (≤1.8× leverage) · idle cash → BIL T-bills
                  · early-warning de-risk
 deploy:  python runners\daily_rebalance.py --book portfolio_full \
@@ -38,6 +39,7 @@ Residual risk: an unprecedented one-day gap hurts ~1.8× as much.
 | **xs_dualmom** | cross-sectional 12-1 momentum, top-K, cash in bear | **full S&P 500** | `lookback=252, skip=21, k=10, market_filter SPY>200d` | 1.26 / 36.2% / −34.4% |
 | **recovery** | catch bull-run snapbacks: reclaim 50d after below 200d, hold | quality-10 | `hold_days=120` | 0.90 / 9.8% / −21.5% |
 | **pead** | post-earnings drift: buy gap-up beats, hold the drift | **full S&P 500** | `gap_pct=0.05, vol_mult=2.0, hold_days=60` (live: 25 freshest) | 1.10 / 5.0% / −10.2% |
+| **lowvol_def** | hold 30 lowest-realized-vol names while SPY>200d, else → BIL | **full S&P 500** | `vol_window=60, k=30, market_filter SPY>200d` | 1.09 / 10.0% / −12.8% |
 
 ### Candidate sleeves (in the allocator pool; deploy only if they pass the gate)
 | Sleeve | Mechanism | Parameters | Status |
@@ -52,10 +54,23 @@ Residual risk: an unprecedented one-day gap hurts ~1.8× as much.
 | high_momentum | 52-week-high proximity momentum (George-Hwang) | `lookback=252, near_pct=0.05, exit_pct=0.15` | rejected: Sharpe 1.05 but DD −15.0% + slightly *hurts* book (overlaps trend/xs) |
 | bollinger_revert | buy lower Bollinger band in uptrend, exit mid-band | `window=20, num_std=2, trend_sma=200` | rejected: Sharpe 0.60 (overlaps RSI-2) |
 | ma_pullback | buy pullback to 20-day MA in a 50/200 uptrend | `pull_sma=20, fast=50, slow=200, target_pct=0.03` | rejected: DD −20.8% (overlaps RSI-2) |
+| bond_trend | abs-momentum on TLT/IEF | `lookback=126` | rejected: −0.19 corr but costs ~2pt CAGR for 1pt DD (bad trade) |
+| commodity_trend | abs-momentum on GLD/DBC/SLV | `lookback=126` | rejected: +0.02 Sharpe (noise) |
+| intl_trend | abs-momentum on EFA/EEM/VEA/VWO | `lookback=126` | rejected: corr 0.56, −0.03 Sharpe |
+| allweather_trend | abs-momentum on 7 asset-class ETFs | `lookback=126` | rejected: costs ~1pt CAGR for 0.5pt DD |
+| **lowvol_factor** | hold 30 lowest-realized-vol S&P names, monthly | `vol_window=60, k=30` | **PASSES** @12%: Sharpe 1.46→1.53, CAGR 18.6%, DD −14.1% — clean, board-friendly |
+| **crypto_trend** | abs-momentum on BTC+ETH | `lookback=126` | **PASSES @≤5%**: Sharpe →1.63, CAGR →21.6%, DD −14.2% — but 45% standalone CAGR is a one-time secular bull; governance-gated |
 
-*Finding: the long/flat equity-factor space on these names is **saturated** — every new
-price-pattern sleeve overlaps the six deployed ones and adds only noise. Genuine
-diversification now requires a different return SOURCE (e.g. the options vol-risk-premium below).*
+*Finding 1 — equity-pattern saturation: every new long/flat price-pattern sleeve on the
+quality-10 overlaps the six deployed ones and adds only noise.*
+*Finding 2 — asset-class diversifiers (bonds/commodities/intl/all-weather) all REDUCE
+return for marginal drawdown help; the vol-target overlay already provides cheaper crash
+protection. The only additive sources found: the **low-vol equity factor** (modest, safe)
+and a small **crypto-trend** sleeve (powerful but backward-looking + governance-gated).*
+*Finding 3 — ML trade-failure study (`runners/trade_failure_ml.py`): walk-forward logistic
+model on entry features gives OOS AUC ≈ 0.50 (RSI-2) / 0.53 (Donchian) — i.e. trade
+outcomes are **not predictable** from entry conditions. No ML entry-filter is wired; the
+deployed sleeves are already efficient (a healthy negative result, not a curve-fit).*
 
 ---
 
@@ -63,7 +78,7 @@ diversification now requires a different return SOURCE (e.g. the options vol-ris
 
 | Book | Weights | Sharpe / CAGR / DD | Use |
 |---|---|---|---|
-| **`portfolio_full`** ⭐ | rsi .28, don .22, trd .14, xs .08, rec .18, pead .10 | 1.46 / 18.2% / −13.1% | **deployed** @ vt 17% / 1.8× — best all-round |
+| **`portfolio_full`** ⭐ | 6 price sleeves ×0.90 + lowvol_def .10 | 1.53 / 18.4% / −13.4% | **deployed** @ vt 17% / 1.8× — best all-round |
 | `portfolio_rec` | rsi .32, don .24, trd .16, xs .08, rec .20 | 1.43 / 17.1% / −14.1% | max lean-year capture |
 | `portfolio_div` | rsi .35, don .27, trd .15, xs .08, pead .15 | 1.47 / 16.0% / −12.3% | smoothing via PEAD |
 | `portfolio` | risk-parity rsi .41, don .32, trd .18, xs .09 | 1.39 / 16.2% / −13.0% | core risk-parity |

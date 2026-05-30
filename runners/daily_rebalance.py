@@ -75,11 +75,14 @@ BOOKS = {
     # Sharpe to 1.43 and CAGR to 17.1% at -14.1% DD. Run with --vol-target 0.15.
     "portfolio_rec": {"rsi2_meanrev": 0.32, "donchian": 0.24, "trend_5020": 0.16,
                       "xs_dualmom": 0.08, "recovery": 0.20},
-    # portfolio_full: all 6 sleeves — core + recovery (bull capture) + PEAD
-    # (event-driven smoothing). Best combined: Sharpe 1.45, 16.7% CAGR, -13.8% DD,
-    # 2018-2020 +8.1%, 5/5 folds. Run with --vol-target 0.15.
-    "portfolio_full": {"rsi2_meanrev": 0.28, "donchian": 0.22, "trend_5020": 0.14,
-                       "xs_dualmom": 0.08, "recovery": 0.18, "pead": 0.10},
+    # portfolio_full: 7 sleeves — core + recovery (bull capture) + PEAD (event
+    # smoothing) + defensive lowvol (bear/vol ballast: holds the 30 lowest-vol S&P
+    # names while SPY > 200d, rotates to BIL otherwise). The six price sleeves are
+    # scaled to 90% and lowvol takes 10%. Sharpe 1.53, 18.4% CAGR, -13.4% DD, 5/5
+    # folds. Run with --vol-target 0.17 --max-leverage 1.8.
+    "portfolio_full": {"rsi2_meanrev": 0.252, "donchian": 0.198, "trend_5020": 0.126,
+                       "xs_dualmom": 0.072, "recovery": 0.162, "pead": 0.090,
+                       "lowvol_def": 0.10},
 }
 
 PEAD_PARAMS = {"gap_pct": 0.05, "vol_mult": 2.0, "hold_days": 60}
@@ -150,6 +153,7 @@ def fetch_daily(ticker: str, lookback_days: int = 400, source: str = "auto") -> 
 
 # cross-sectional dual-momentum sleeve config (matches backtest_cross_sectional)
 XS_LOOKBACK, XS_SKIP, XS_MKT, XS_SMA = 252, 21, "SPY", 200
+LOWVOL_K, LOWVOL_VOLWIN = 30, 60          # defensive low-vol sleeve: 30 lowest 60d-vol names
 
 
 def target_weights(book: str, universe: list, source: str = "auto",
@@ -174,6 +178,7 @@ def target_weights(book: str, universe: list, source: str = "auto",
         strat_weights = dict(BOOKS[book])    # {strategy: capital weight}
         xs_alloc = strat_weights.pop("xs_dualmom", 0.0)
     pead_alloc = strat_weights.pop("pead", 0.0)
+    lowvol_alloc = strat_weights.pop("lowvol_def", 0.0)
     n = len(universe)
     weights = {t: 0.0 for t in universe}
     last_price, detail, closes = {}, {t: [] for t in universe}, {}
@@ -255,6 +260,41 @@ def target_weights(book: str, universe: list, source: str = "auto",
                 if t not in last_price:
                     last_price[t] = px
             print(f"  [pead] holding {len(active)} freshest post-earnings-drift names")
+
+    # lowvol sleeve (defensive): hold the K lowest realized-vol S&P 500 names,
+    # equal weight, ONLY while SPY > its 200-day. In a bear (SPY < 200d) this alloc
+    # stays idle and is swept to BIL by park_cash -> the sleeve sits out slow bears
+    # (2018/2022 finished flat-to-up) instead of riding them down.
+    if lowvol_alloc > 0:
+        lv_on = True
+        try:
+            mkt = fetch_daily(XS_MKT, source=source)["close"]
+            lv_on = float(mkt.iloc[-1]) > float(mkt.rolling(XS_SMA).mean().iloc[-1])
+        except Exception:
+            pass
+        if lv_on:
+            from data.sp500 import sp500_tickers
+            vols = {}
+            for t in sp500_tickers():
+                try:
+                    c = daily_bars(t)["close"]
+                except Exception:
+                    continue
+                if len(c) < LOWVOL_VOLWIN + 5:
+                    continue
+                rv = float(c.pct_change().rolling(LOWVOL_VOLWIN).std().iloc[-1])
+                if rv == rv and rv > 0:
+                    vols[t] = (rv, c)
+            picks = sorted(vols, key=lambda t: vols[t][0])[:LOWVOL_K]
+            for t in picks:
+                weights[t] = weights.get(t, 0.0) + lowvol_alloc * (1.0 / len(picks))
+                detail.setdefault(t, []).append("lowvol_def")
+                if t not in last_price:
+                    c = vols[t][1]
+                    last_price[t] = float(c.iloc[-1]); closes[t] = c
+            print(f"  [lowvol] holding {len(picks)} lowest-vol S&P names (SPY > 200d)")
+        else:
+            print("  [lowvol] SPY < 200d -> lowvol sleeve in cash (BIL)")
 
     # regime_adaptive: bear -> defensive gold+cash; else apply conditional leverage
     if book == "regime_adaptive":

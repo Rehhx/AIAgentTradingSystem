@@ -29,7 +29,7 @@ Regenerate its data after a change with `python runners/build_dashboard_data.py`
 
 ## The deployable strategy
 
-A diversified **ensemble of six mechanisms**, each independently screened against
+A diversified **ensemble of seven mechanisms**, each independently screened against
 the risk gate and walk-forward, combined by weight and volatility-targeted:
 
 | Component | Universe | Role |
@@ -40,6 +40,7 @@ the risk gate and walk-forward, combined by weight and volatility-targeted:
 | Cross-sectional dual-momentum | **full S&P 500** | hold top-10 relative-strength names; cash in bear markets |
 | Recovery-thrust | 10 quality names | catch bull-run snapbacks off the 200-day (lean-year capture) |
 | PEAD (post-earnings drift) | **full S&P 500** | hold gap-up earnings beats through the drift |
+| Defensive low-volatility | **full S&P 500** | hold 30 lowest-vol names while SPY>200d, else rotate to T-bills (bear/vol ballast) |
 
 Three overlays on top: **vol-targeting** (17%, ≤1.8× conditional leverage),
 **idle cash → BIL T-bills**, and an **early-warning de-risk** (cut to 60% when
@@ -47,7 +48,7 @@ SPY < 50-day and vol spikes, ahead of the lagging 200-day bear signal).
 
 | Deploy book | Sharpe | $ PnL / $100k | CAGR | Max DD | Risk gate | Walk-forward |
 |---|---|---|---|---|---|---|
-| **`portfolio_full`** (6 sleeves, vol-target 17%, 1.8× cap) ⭐ | **1.46** | **+$469,050** | **18.2%** | **−13.1%** | ✅ PASS | ✅ 5/5 folds |
+| **`portfolio_full`** (7 sleeves, vol-target 17%, 1.8× cap) ⭐ | **1.53** | **+$475,850** | **18.4%** | **−13.4%** | ✅ PASS | ✅ 5/5 folds |
 | `blended_plus` (equal-weight, no leverage) | 1.44 | +$308,115 | 14.5% | −12.7% | ✅ PASS | ✅ 5/5 folds |
 
 Backtest: 2016–2026, adjusted daily data, 6 bps round-trip, well above the desk's
@@ -106,7 +107,7 @@ $250 no-trade band. `run_rebalance.ps1` wraps this for Windows Task Scheduler.
 ### Book menu (pick by risk appetite)
 | Book | Sharpe | CAGR | Max DD | Notes |
 |---|---|---|---|---|
-| **`portfolio_full`** (6 sleeves + vol-target 17%/1.8×) ⭐ | 1.46 | 18.2% | −13.1% | deployed 15–20% target book |
+| **`portfolio_full`** (7 sleeves + vol-target 17%/1.8×) ⭐ | 1.53 | 18.4% | −13.4% | deployed 15–20% target book |
 | `blended_plus` + full-500 xs + vol-target | 1.44 | 14.5% | −12.7% | no leverage |
 | `regime_adaptive --max-leverage 1.5` | 1.41 | 20.8% | −18.4% | aggressive growth (paper) |
 | `defensive` (+ turn-of-month) | 1.22 | 8.3% | −8.3% | lowest risk |
