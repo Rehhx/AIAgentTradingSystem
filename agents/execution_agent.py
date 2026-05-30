@@ -104,8 +104,10 @@ class ExecutionAgent:
         if self.simulated or self.client is None:
             return []
         try:
+            # Alpaca returns class shares as BRK.B; map back to the book's
+            # yfinance convention (BRK-B) so the reconciler matches by symbol.
             return [
-                {"symbol": p.symbol, "qty": float(p.qty),
+                {"symbol": p.symbol.replace(".", "-"), "qty": float(p.qty),
                  "avg_entry_price": float(p.avg_entry_price),
                  "unrealized_pl": float(p.unrealized_pl),
                  "market_value": float(p.market_value)}
@@ -122,6 +124,10 @@ class ExecutionAgent:
     def _submit_alpaca(self, ticker, side, qty, notional, order_type, tif, limit_price):
         from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
         from alpaca.trading.enums import OrderSide, TimeInForce
+
+        # yfinance uses BRK-B / BF-B for class shares; Alpaca expects BRK.B / BF.B
+        if "-" in ticker and len(ticker.rsplit("-", 1)[-1]) == 1:
+            ticker = ticker.replace("-", ".")
 
         side_enum = OrderSide.BUY if side == "buy" else OrderSide.SELL
         tif_enum  = TimeInForce.DAY if tif == "day" else TimeInForce.GTC
