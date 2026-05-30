@@ -435,6 +435,8 @@ def main():
                     help="OPT-IN: enable the BTC/ETH momentum sleeve (needs board sign-off)")
     ap.add_argument("--crypto-weight", type=float, default=0.05,
                     help="crypto sleeve weight when --crypto-sleeve is set (default 5%%)")
+    ap.add_argument("--account", type=int, default=1, choices=[1, 2],
+                    help="which Alpaca paper account (1=default keys, 2=ALPACA_*_2 keys)")
     args = ap.parse_args()
 
     if args.universe.strip().lower() == "quality":
@@ -447,7 +449,12 @@ def main():
     print(f"\nDaily rebalance | book={args.book} | {mode}")
     print(f"Universe ({len(universe)}): {', '.join(universe)}\n")
 
-    agent = ExecutionAgent()
+    if args.account == 2:
+        from config import ALPACA_API_KEY_2, ALPACA_API_SECRET_2
+        agent = ExecutionAgent(api_key=ALPACA_API_KEY_2, api_secret=ALPACA_API_SECRET_2)
+    else:
+        agent = ExecutionAgent()
+    print(f"Alpaca account: #{args.account}")
     if args.live and agent.simulated:
         print("  [warn] Alpaca creds missing -- --live will only SIMULATE fills.")
 

@@ -28,6 +28,9 @@ for d in [RESULTS_DIR, STRATEGIES_DIR, LOGS_DIR]:
 # ---------------------------------------------------------------------------
 ALPACA_API_KEY    = os.getenv("ALPACA_API_KEY", "")
 ALPACA_API_SECRET = os.getenv("ALPACA_API_SECRET", "")
+# second paper account — run two books in parallel (daily_rebalance --account 2)
+ALPACA_API_KEY_2    = os.getenv("ALPACA_API_KEY_2", "")
+ALPACA_API_SECRET_2 = os.getenv("ALPACA_API_SECRET_2", "")
 ALPACA_PAPER      = True   # always True until we deliberately go live
 
 # ---------------------------------------------------------------------------

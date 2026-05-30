@@ -40,13 +40,15 @@ log = logging.getLogger("execution_agent")
 class ExecutionAgent:
     """matches BaseAgent.run(task) contract used by orchestrator."""
 
-    def __init__(self, store=None):
+    def __init__(self, store=None, api_key=None, api_secret=None):
         self.store    = store
         self.client   = None
         self.simulated = False
         self.log      = logging.getLogger("execution_agent")
 
-        if not ALPACA_API_KEY or not ALPACA_API_SECRET:
+        key    = api_key or ALPACA_API_KEY          # default = account 1; pass keys for account 2
+        secret = api_secret or ALPACA_API_SECRET
+        if not key or not secret:
             self.log.warning("ALPACA creds missing — running in SIMULATED mode")
             self.simulated = True
             return
@@ -54,8 +56,8 @@ class ExecutionAgent:
         try:
             from alpaca.trading.client import TradingClient
             self.client = TradingClient(
-                api_key    = ALPACA_API_KEY,
-                secret_key = ALPACA_API_SECRET,
+                api_key    = key,
+                secret_key = secret,
                 paper      = ALPACA_PAPER,
             )
             self.log.info(f"alpaca trading client ready | paper={ALPACA_PAPER}")
