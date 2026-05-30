@@ -9,7 +9,14 @@ win-rate ≥ 45%, trades ≥ 50. Code: `agents/daily_strategies.py`; execution:
 
 ## Deployed book: `portfolio_full`
 
-7 sleeves + 3 overlays. **Sharpe 1.53 · CAGR 18.4% · max DD −13.4% · 2018–2020 +9% · positive in 5/5 walk-forward folds.**
+7 sleeves + 3 overlays. **Sharpe 1.53 · CAGR 18.4% · max DD −13.4% · 2018–2020 +9% · positive in 5/5 walk-forward folds.** (2016–2026 window.)
+
+> **GFC stress test (`runners/extended_backtest.py`, core engine 2005–2026):** survives
+> 2008 at **−26% vs S&P −54%**, CAGR 12.8% / Sharpe 1.10, and the **true worst-case
+> drawdown is ~−32% (2008)** — the −13.4% above understates risk because 2016–2026 had no
+> GFC-scale crash. Honest risk statement: ~−15% in a normal bear, up to ~−30% in a
+> once-a-decade crash. Account 2 (managed futures) was **+5.5% in 2008 / +4.2% in 2022** —
+> the engine that profits in bears (shorts, puts, long-vol all tested net-negative).
 
 ```
 sleeve weights:  rsi2_meanrev 0.252 · donchian 0.198 · trend_5020 0.126

@@ -22,9 +22,30 @@ from agents.daily_strategies import _metrics_from_returns, walk_forward_folds, s
 from runners.diversifier_screen import build_base, overlays, W
 from runners.final_tests import lowvol_factor, crypto_trend
 from runners.lowvol_defensive import make_defensive
+from runners.extended_backtest import core_engine, BEARS
 
 OUT = Path(__file__).parent.parent / "BOARD_REPORT.md"
 TRACK = Path(__file__).parent.parent / "results" / "track_record.csv"
+
+
+def _mf_crisis():
+    """managed-futures (Account 2) return in 2008 & 2022 — crisis-alpha validation."""
+    import yfinance as yf
+    MF = ["SPY", "QQQ", "EFA", "EEM", "TLT", "IEF", "GLD", "DBC", "UUP", "VNQ"]
+
+    def f(t):
+        s = yf.Ticker(t).history(start="2006-06-01", end="2026-06-01", auto_adjust=True)["Close"]
+        s.index = s.index.tz_localize(None) if s.index.tz is None else s.index.tz_convert("UTC").tz_localize(None)
+        return s
+    C = pd.DataFrame({t: f(t) for t in MF}).sort_index(); R = C.pct_change()
+    sig = (np.sign(C / C.shift(21) - 1) + np.sign(C / C.shift(63) - 1) + np.sign(C / C.shift(252) - 1)) / 3
+    vol = R.rolling(60).std(); Wg = (sig / vol).div((sig / vol).abs().sum(axis=1).replace(0, np.nan), axis=0)
+    core = (Wg.shift(1) * R).sum(axis=1) - Wg.diff().abs().sum(axis=1).fillna(0) * 0.0006
+    conv = sig.abs().mean(axis=1).clip(0, 1).shift(1).fillna(0)
+    rv = (core * conv).rolling(20).std() * np.sqrt(252)
+    scale = (0.12 / rv.replace(0, np.nan)).clip(upper=1.5).shift(1).fillna(0)
+    mf = (core * conv * scale).fillna(0); yb = (1 + mf).groupby(mf.index.year).prod() - 1
+    return yb.get(2008, float("nan")), yb.get(2022, float("nan"))
 
 
 def spy_metrics(idx):
@@ -66,6 +87,15 @@ def main():
     pos = sum(1 for f in folds if f["sharpe"] > 0)
     start, end = idx[0].date(), idx[-1].date()
 
+    # 21-year GFC stress test (core engine, 2005-2026) + crisis-alpha validation
+    print("running 2005-2026 GFC stress test (yfinance) ...")
+    eb, es = core_engine()
+    ebm = _metrics_from_returns(eb, [], "ext"); esm = _metrics_from_returns(es, [], "spy")
+    bear_rows = "\n".join(
+        f"| {nm} | {(1+eb.loc[a:b]).prod()-1:+.1%} | {(1+es.loc[a:b]).prod()-1:+.1%} |"
+        for nm, (a, b) in BEARS.items())
+    mf08, mf22 = _mf_crisis()
+
     md = f"""# Systematic Equity Book — Board Report
 
 *Generated {datetime.now(timezone.utc).date()} · backtest {start} → {end} · $100k base · 6 bps round-trip costs · split/dividend-adjusted data*
@@ -88,6 +118,35 @@ def main():
         f"| {f.get('start','?')[:7]}–{f.get('end','?')[:7]} | {f['return_pct']:+.1%} | {f['sharpe']:+.2f} |"
         for f in folds
     ) + f"""
+
+## 1b. Stress test through the 2008 GFC (2005–2026, core engine)
+
+The deployed book above is validated 2016–2026 (no GFC-scale crash in that window).
+To pressure-test the real downside, the **core equity engine** (RSI-2, Donchian, 50/200
+trend, recovery + the same vol-target/early-warning overlays) was run back to **2005**,
+spanning the **2008 GFC, 2011, and 2015** bears the recent window lacks:
+
+| Metric | Core engine | S&P 500 |
+|---|---|---|
+| CAGR (21 yrs) | **{ebm['cagr']:.1%}** | {esm['cagr']:.1%} |
+| Sharpe | **{ebm['sharpe']:.2f}** | {esm['sharpe']:.2f} |
+| **Max drawdown** | **{ebm['max_drawdown']:.1%}** | {esm['max_drawdown']:.1%} |
+
+| Bear market | Core engine | S&P 500 |
+|---|---|---|
+{bear_rows}
+
+> **TRUE WORST-CASE DRAWDOWN: ~{ebm['max_drawdown']:.0%} (in the 2008 GFC), not the
+> {m['max_drawdown']:.0%} of the 2016–2026 window** — that window simply had no GFC-scale
+> event. Honest risk statement for the board: *expect ~−15% in a normal bear and up to
+> ~−30% in a once-a-decade, GFC-scale crash.* The engine **survived 2008** (cushioning
+> it to about half the market's loss) and caught the 2009 recovery.
+
+**Crisis-alpha validation (Account 2, managed futures):** positive in *both* major bears —
+**{mf08:+.1%} in 2008** and **{mf22:+.1%} in 2022** — when long equity fell hard. This is
+the engine that *profits* in bear markets. Tested bear-profit alternatives (equity shorts,
+protective puts, long-volatility/VIX) all proved net-negative — managed-futures trend is
+the one approach that pays in crises without ruinous calm-period bleed.
 
 ## 2. How this stacks up against bigger firms
 

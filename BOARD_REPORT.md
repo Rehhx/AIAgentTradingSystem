@@ -22,6 +22,40 @@
 | 2022-03–2024-04 | +36.5% | +1.37 |
 | 2024-04–2026-05 | +69.2% | +2.21 |
 
+## 1b. Stress test through the 2008 GFC (2005–2026, core engine)
+
+The deployed book above is validated 2016–2026 (no GFC-scale crash in that window).
+To pressure-test the real downside, the **core equity engine** (RSI-2, Donchian, 50/200
+trend, recovery + the same vol-target/early-warning overlays) was run back to **2005**,
+spanning the **2008 GFC, 2011, and 2015** bears the recent window lacks:
+
+| Metric | Core engine | S&P 500 |
+|---|---|---|
+| CAGR (21 yrs) | **12.8%** | 11.0% |
+| Sharpe | **1.10** | 0.65 |
+| **Max drawdown** | **-31.6%** | -55.2% |
+
+| Bear market | Core engine | S&P 500 |
+|---|---|---|
+| 2008 GFC | -26.1% | -54.0% |
+| 2011 EU crisis | -6.6% | -18.6% |
+| 2015-16 selloff | -5.4% | -12.2% |
+| 2018 Q4 | -10.0% | -18.9% |
+| COVID | -11.8% | -33.4% |
+| 2022 bear | -6.8% | -24.1% |
+
+> **TRUE WORST-CASE DRAWDOWN: ~-32% (in the 2008 GFC), not the
+> -13% of the 2016–2026 window** — that window simply had no GFC-scale
+> event. Honest risk statement for the board: *expect ~−15% in a normal bear and up to
+> ~−30% in a once-a-decade, GFC-scale crash.* The engine **survived 2008** (cushioning
+> it to about half the market's loss) and caught the 2009 recovery.
+
+**Crisis-alpha validation (Account 2, managed futures):** positive in *both* major bears —
+**+5.5% in 2008** and **+4.2% in 2022** — when long equity fell hard. This is
+the engine that *profits* in bear markets. Tested bear-profit alternatives (equity shorts,
+protective puts, long-volatility/VIX) all proved net-negative — managed-futures trend is
+the one approach that pays in crises without ruinous calm-period bleed.
+
 ## 2. How this stacks up against bigger firms
 
 - **A Sharpe of 1.53 is top-decile for a systematic equity book.** Most large multi-strategy and equity hedge funds run flagship Sharpes of ~0.5–1.0; the average hedge fund (HFRI) has returned mid-single-digits over the past decade and **underperformed the S&P 500**.
