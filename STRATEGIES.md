@@ -139,6 +139,39 @@ which is why they add value where new equity sleeves don't. Both fully collatera
 Run: `python runners\options_income.py --kind putwrite --tickers SPY QQQ`
 (or `--kind buywrite`; `--vrp 0.02..0.04` to stress the premium assumption).
 
+## Regime coverage & why there's no crash-hedge (`runners/regime_coverage.py`)
+Audit of the deployed book by regime (trend × vol), 2016–2026:
+
+| Regime | % days | SPY ann | Book ann | Coverage |
+|---|---|---|---|---|
+| Bull · calm | 70% | +20.5% | +25.2% | ✅ beats market |
+| Bull · stormy | 7% | +80.5% | +35.9% | ⚠️ lags violent rallies (vol-target caps), still +36% |
+| Bear · calm | 10% | −2.9% | −9.8%* | ✅ not a gap — see note |
+| Bear · stormy / crash | 13% | −28.0% | −12.5% | ✅ cushioned (−1.7% on worst-1% days) |
+
+*The Bear·calm −9.8% looked like a gap but a sub-bucket diagnosis
+(`grind_fix_test.py` + diagnosis) shows it is **not**: in the genuine grind-down
+(below both 50d & 200d) the book loses −36% ann vs SPY −57% (it loses *less*); the
+−9.8% is dominated by the book being prudently cautious in **below-200d recovery
+bounces** (captured +8% of a +34% rally — a lag, not a loss) plus a small-sample
+annualization artifact (2016 was +2.9%). Three de-risk fixes (200d leverage cap,
+dual-MA grind de-risk, protective puts) all REDUCED risk-adjusted return without
+improving it — there is no downside hole to plug here.
+
+Up-capture 68% / down-capture 60%; book max DD −13.4% vs SPY −33.7%.
+**The book cushions crashes, it does not profit from them** (it's long-biased).
+Two ways to add crash protection were tested and BOTH rejected:
+- *Trend-aware leverage cap* (no leverage below 200d, `runners/regime_fix_test.py`):
+  backfired — cut CAGR 18.4%→17.7% and made Bear·calm worse, because the leverage
+  it removes also funds the below-200d recovery bounces.
+- *Protective-put overlay* (`runners/tail_hedge.py`): costs up to 2.6pt CAGR and
+  only helps a fast single-month crash; slow bears (2018/2022) get worse from
+  premium bleed. Not worth it — the existing overlays cover the downside cheaper.
+
+Conclusion: the book is at its efficient frontier for daily, mostly-no-leverage
+strategies on this universe (~24 ideas tested). Next gains come from a live
+paper track record + monitoring, not strategy #25.
+
 ## Honest caveats
 Long-biased equity book, validated 2016–2026 (one decade, one out-of-sample window).
 Not market-neutral; lean years (2018-style) are cushioned by cash yield + recovery

@@ -119,6 +119,29 @@ $250 no-trade band. `run_rebalance.ps1` wraps this for Windows Task Scheduler.
 
 ---
 
+## Monitoring & live track record
+
+Run once a day after the rebalance (the scheduler does this automatically):
+
+```powershell
+python runners\monitor.py            # regime-posture check + append today's P&L
+python runners\monitor.py --history  # also print the full track-record table
+```
+
+It does three things: (1) a **regime-posture check** — detects the current market
+regime (bull-calm / bull-volatile / bear) and verifies the live book is positioned
+the way it *should* be for that regime, flagging any mismatch; (2) a **track record**
+— appends daily equity + P&L to `results/track_record.csv` and reports realized
+return / Sharpe / drawdown vs SPY over the tracked window (the live proof the book
+behaves like the backtest); (3) **alarms** — drawdown breach (< −15% gate), outsized
+daily move, or posture drift. Read-only; never trades.
+
+| Regime | Intended posture |
+|---|---|
+| Bull · calm | risk-on, full/levered exposure (≤1.8×), recovery + lowvol active |
+| Bull · volatile | vol-target de-levers, mean-reversion favored |
+| Bear / downtrend | de-risked: momentum → cash, lowvol → BIL, early-warning cut to 60% |
+
 ## Repository layout
 
 ```
@@ -151,6 +174,8 @@ quant-agent/
 | `deploy_check.py` | PnL + risk gate + walk-forward for every book + the deploy ensemble |
 | `daily_book.py` | board report for the daily books on any universe |
 | `daily_rebalance.py` | live/dry-run Alpaca paper rebalancer (the deploy path) |
+| `monitor.py` | daily regime-posture check + track-record (P&L vs SPY) + drawdown/drift alarms |
+| `regime_coverage.py` | audit: how the book performs in each market regime (bull/bear/volatile) |
 | `walk_forward_daily.py` | anchored walk-forward with per-fold parameter re-optimization |
 | `cross_sectional.py` | cross-sectional momentum / dual-momentum sweep |
 | `derisk_wf.py` | vol-targeting + walk-forward on the high-return books |

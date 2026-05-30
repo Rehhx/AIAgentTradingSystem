@@ -19,3 +19,8 @@ Set-Location $proj
       --vol-target 0.17 --max-leverage 1.8 --live *>> $log
 
 "==== exit code $LASTEXITCODE ====" | Out-File -Append -Encoding utf8 $log
+
+# monitoring + track-record: regime-posture check, daily P&L log, drawdown/drift alarms
+"==== $(Get-Date -Format 'HH:mm:ss') | monitor / track-record ====" |
+    Out-File -Append -Encoding utf8 $log
+& $py "runners\monitor.py" *>> $log
