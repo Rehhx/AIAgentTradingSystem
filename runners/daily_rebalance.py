@@ -159,7 +159,8 @@ LOWVOL_K, LOWVOL_VOLWIN = 30, 60          # defensive low-vol sleeve: 30 lowest 
 def target_weights(book: str, universe: list, source: str = "auto",
                    xs_universe: str = "same", vol_target_pct: float = 0.0,
                    max_lev: float = 1.0, park_cash: str = "BIL",
-                   early_warning: bool = True) -> tuple[dict, dict, dict]:
+                   early_warning: bool = True, name_cap: float = 0.0,
+                   crypto_weight: float = 0.0) -> tuple[dict, dict, dict]:
     """returns (weights, last_price, detail). Per-ticker sleeves give each long
     name alloc/N. The 'xs_dualmom' sleeve ranks a (possibly larger) universe by
     12-1 momentum and gives the top-K names alloc/K (cash when SPY < its 200d
@@ -308,6 +309,31 @@ def target_weights(book: str, universe: list, source: str = "auto",
         elif leverage != 1.0:
             weights = {t: w * leverage for t, w in weights.items()}
 
+    # crypto sleeve (OPT-IN, default off): absolute-momentum on BTC/ETH. Carves out
+    # crypto_weight from the book (scales the rest down) and allocates to each crypto
+    # whose 6-month trend is up, else leaves it idle -> BIL. GOVERNANCE-GATED: only
+    # enable with explicit board sign-off; sized small (~5%) to stay inside the gate.
+    if crypto_weight > 0:
+        for t in list(weights):
+            weights[t] *= (1 - crypto_weight)
+        on = []
+        for sym in ("BTC-USD", "ETH-USD"):
+            try:
+                d = fetch_daily(sym, source=source)
+                if float(ALL_SIGNALS["abs_momentum"](d, {"lookback": 126}).iloc[-1]) > 0:
+                    on.append((sym, d["close"]))
+            except Exception as e:
+                print(f"  [crypto] {sym} skipped: {e}")
+        per = crypto_weight / 2.0          # equal-weight over the 2-name crypto universe
+        for sym, c in on:
+            weights[sym] = weights.get(sym, 0.0) + per
+            detail.setdefault(sym, []).append("crypto_mom")
+            last_price[sym] = float(c.iloc[-1]); closes[sym] = c
+        if on:
+            print(f"  [crypto] momentum ON ({crypto_weight:.0%} sleeve): {', '.join(s for s, _ in on)}")
+        else:
+            print(f"  [crypto] momentum OFF -> {crypto_weight:.0%} stays in cash/BIL")
+
     # volatility-targeting overlay: scale the whole book to target annualized vol
     if vol_target_pct > 0:
         held = {t: w for t, w in weights.items() if w > 0 and t in closes}
@@ -334,6 +360,18 @@ def target_weights(book: str, universe: list, source: str = "auto",
                 print("  [early-warning] SPY < 50d AND vol > 20% -> de-risked to 60%")
         except Exception:
             pass
+
+    # single-name concentration cap (risk governance): no individual ticker above
+    # name_cap of the book; freed exposure is swept to T-bills below. A forward
+    # safety rail -- currently near-non-binding (largest name ~10%) but caps any one
+    # stock from dominating if its sleeve signals stack or leverage rises.
+    if name_cap and name_cap > 0:
+        capped = [t for t, w in weights.items()
+                  if w > name_cap and t != (park_cash or "")]
+        for t in capped:
+            weights[t] = name_cap
+        if capped:
+            print(f"  [name-cap] capped {len(capped)} name(s) at {name_cap:.0%}: {', '.join(sorted(capped))}")
 
     # park idle cash in a T-bill ETF so uninvested capital earns ~yield, not 0%.
     # Self-reinforcing for lean years: defensive periods hold more cash -> more yield.
@@ -391,6 +429,12 @@ def main():
                     help="park idle cash in this T-bill ETF for yield ('' to disable)")
     ap.add_argument("--no-early-warning", action="store_true",
                     help="disable the SPY-50d/vol early-warning de-risk overlay")
+    ap.add_argument("--name-cap", type=float, default=0.10,
+                    help="max weight per single name (risk governance); 0 = off")
+    ap.add_argument("--crypto-sleeve", action="store_true",
+                    help="OPT-IN: enable the BTC/ETH momentum sleeve (needs board sign-off)")
+    ap.add_argument("--crypto-weight", type=float, default=0.05,
+                    help="crypto sleeve weight when --crypto-sleeve is set (default 5%%)")
     args = ap.parse_args()
 
     if args.universe.strip().lower() == "quality":
@@ -413,7 +457,8 @@ def main():
         args.book, universe, args.source, xs_universe=args.xs_universe,
         vol_target_pct=args.vol_target, max_lev=args.max_leverage,
         park_cash=(args.park_cash.strip().upper() or None),
-        early_warning=(not args.no_early_warning))
+        early_warning=(not args.no_early_warning), name_cap=args.name_cap,
+        crypto_weight=(args.crypto_weight if args.crypto_sleeve else 0.0))
     equity, esrc = get_equity(agent, args.notional)
     held = current_positions(agent)
 

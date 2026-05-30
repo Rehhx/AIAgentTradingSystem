@@ -59,7 +59,10 @@ Residual risk: an unprecedented one-day gap hurts ~1.8× as much.
 | intl_trend | abs-momentum on EFA/EEM/VEA/VWO | `lookback=126` | rejected: corr 0.56, −0.03 Sharpe |
 | allweather_trend | abs-momentum on 7 asset-class ETFs | `lookback=126` | rejected: costs ~1pt CAGR for 0.5pt DD |
 | **lowvol_factor** | hold 30 lowest-realized-vol S&P names, monthly | `vol_window=60, k=30` | **PASSES** @12%: Sharpe 1.46→1.53, CAGR 18.6%, DD −14.1% — clean, board-friendly |
-| **crypto_trend** | abs-momentum on BTC+ETH | `lookback=126` | **PASSES @≤5%**: Sharpe →1.63, CAGR →21.6%, DD −14.2% — but 45% standalone CAGR is a one-time secular bull; governance-gated |
+| **crypto_trend** | abs-momentum on BTC+ETH | `lookback=126` | **PASSES @≤5%**: Sharpe →1.69, CAGR →21.8%, DD −13.7% — WIRED as opt-in (`--crypto-sleeve`, default OFF); 45% standalone is a one-time secular bull; **governance-gated** |
+| recovery_xs | recovery on full S&P 500 (cross-sectional) | `hold_days=120, cap=0.10` | rejected: CAGR 15% but DD −39%, lowers book Sharpe; corr 0.72 to recovery (redundant) |
+| xs concentration | momentum top-5 vs top-10 | `k=5` | rejected: top-10 already Sharpe-optimal; top-5 = −45% DD for no Sharpe gain |
+| rsi2_xs | RSI-2 mean-reversion on full S&P 500 | `entry_rsi=30, cap=0.05` | rejected: Sharpe 0.50, DD −42% (catches falling knives; the quality-10 filter is what makes RSI-2 work) |
 
 *Finding 1 — equity-pattern saturation: every new long/flat price-pattern sleeve on the
 quality-10 overlaps the six deployed ones and adds only noise.*
@@ -67,10 +70,15 @@ quality-10 overlaps the six deployed ones and adds only noise.*
 return for marginal drawdown help; the vol-target overlay already provides cheaper crash
 protection. The only additive sources found: the **low-vol equity factor** (modest, safe)
 and a small **crypto-trend** sleeve (powerful but backward-looking + governance-gated).*
-*Finding 3 — ML trade-failure study (`runners/trade_failure_ml.py`): walk-forward logistic
-model on entry features gives OOS AUC ≈ 0.50 (RSI-2) / 0.53 (Donchian) — i.e. trade
-outcomes are **not predictable** from entry conditions. No ML entry-filter is wired; the
-deployed sleeves are already efficient (a healthy negative result, not a curve-fit).*
+*Finding 3 — Machine learning adds nothing here, confirmed two ways:*
+*(a) Trade-failure models (`runners/trade_failure_ml.py`): both logistic AND gradient
+boosting give OOS AUC ≈ 0.50 (RSI-2) / 0.50–0.53 (Donchian) — trade outcomes are **not
+predictable** from entry conditions.*
+*(b) ML alpha model (`runners/ml_alpha.py`): a walk-forward HistGradientBoosting return-
+predictor (7 factors, top-30, market-filtered) gets OOS Sharpe 0.98 / −33% DD — **worse**
+than the rule-based momentum sleeve (Sharpe 1.44 / −18%). Tabular financial data is low
+signal-to-noise; the hand-built signals already capture the edge and ML overfits. No ML
+model deployed — a credible negative, not a curve-fit.*
 
 ---
 
@@ -115,29 +123,31 @@ deployed sleeves are already efficient (a healthy negative result, not a curve-f
 - **Cross-sectional sleeves** (xs_dualmom, pead): full S&P 500 (`--xs-universe sp500`).
 - Data: split/dividend-adjusted daily bars (yfinance); `DAILY_USE_ADJUSTED=0` forces raw parquet.
 
-## Options income sleeves (no leverage) — `runners/options_income.py`
-Harvest the **volatility risk premium** (option buyers overpay for insurance: implied
-vol > realized vol). A *different return source* from the price-pattern sleeves —
-which is why they add value where new equity sleeves don't. Both fully collateralized
-(no leverage, no naked short risk). 1-month cycles on SPY+QQQ.
+## Options income sleeves (no leverage) — REJECTED on proper analysis
+Harvest the **volatility risk premium** by selling options. Two versions built:
+`runners/options_income.py` (v1, fixed-% strikes) and `runners/options_income_v2.py`
+(v2, **done properly**: delta-targeted strikes + market filter so you never write
+into a downtrend; honest non-overlapping windows).
 
-| Sleeve | Mechanism | CAGR / vol / Sharpe / DD | Notes |
+**Verdict: does NOT clear the bar.** The proper delta-strike sweep (cash-secured
+put-write, SPY+QQQ, VRP 3pt):
+
+| Put delta | CAGR | Sharpe | Max DD |
 |---|---|---|---|
-| **putwrite** | sell 2% OTM cash-secured put monthly | 9.2% / 7.2% / 1.26 / −11.1% | defensive income; ~half SPY's vol & DD; corr 0.76 |
-| **buywrite** | own SPY/QQQ, sell 2% OTM call monthly | 16.9% / 11.5% / 1.43 / −16.8% | smoother equity; corr 0.90 |
+| 0.10 | 1.7% | 0.27 | −24.0% |
+| 0.25 | 5.1% | 0.60 | −25.9% |
+| 0.45 (near money) | 9.7% | 0.96 | −27.0% |
 
-> **MODELED, not a fill backtest.** No historical option chains available → premiums
-> are Black-Scholes with IV = realized vol + a **volatility-risk-premium markup** (`--vrp`,
-> default 3 vol points, empirically ~what SPX IV−RV has averaged). Sensitivity at 0pt
-> markup: PutWrite Sharpe 0.80, BuyWrite 1.11 — i.e. the edge scales with that one
-> assumption, shown in full in the runner's output. **Validate live on Alpaca paper**
-> (`agents/options_agent.py`) before any real capital. Not yet wired to the live book.
->
-> **Best fit:** the put-write is an upgrade path for the *idle-cash → BIL* overlay
-> (earn ~9% on defensive collateral vs ~4% T-bills), still no leverage.
+Every strike caps at **Sharpe < 1.0 with −24% to −27% drawdown** — it would break
+the −15% gate, Sharpe is far below the book's 1.53, and it's 0.76-correlated to SPY
+(not a diversifier). The VRP is real but it is **payment for selling crash insurance**:
+you get assigned exactly when the market gaps down, *adding* equity-crash exposure we
+already have. **v1's rosy 9.2%/Sharpe 1.26/−11% was a WINDOWING ARTIFACT** (its 21-day
+blocks straddled the COVID crash and skipped the assignment); the honest v2 surfaces
+the true −25% tail. Not deployed. (Still MODELED — no historical chains — but the
+conclusion holds regardless of the VRP assumption since DD is the binding problem.)
 
-Run: `python runners\options_income.py --kind putwrite --tickers SPY QQQ`
-(or `--kind buywrite`; `--vrp 0.02..0.04` to stress the premium assumption).
+Run: `python runners\options_income_v2.py` (`--delta 0.10..0.45`, `--vrp` to stress).
 
 ## Regime coverage & why there's no crash-hedge (`runners/regime_coverage.py`)
 Audit of the deployed book by regime (trend × vol), 2016–2026:
@@ -169,8 +179,11 @@ Two ways to add crash protection were tested and BOTH rejected:
   premium bleed. Not worth it — the existing overlays cover the downside cheaper.
 
 Conclusion: the book is at its efficient frontier for daily, mostly-no-leverage
-strategies on this universe (~24 ideas tested). Next gains come from a live
-paper track record + monitoring, not strategy #25.
+strategies on this universe (~26 ideas tested). The deployed sleeve WEIGHTS were
+also walk-forward validated (`runners/weight_optimize.py`): a Sharpe-maximizing
+optimizer cannot beat the hand-set weights out-of-sample (avg OOS Sharpe 1.37 opt
+vs 1.38 current) and overfits badly (drops RSI-2 to 0.3%). Next gains come from a
+live paper track record + monitoring, not strategy #27.
 
 ## Honest caveats
 Long-biased equity book, validated 2016–2026 (one decade, one out-of-sample window).

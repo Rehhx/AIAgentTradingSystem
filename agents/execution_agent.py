@@ -128,9 +128,14 @@ class ExecutionAgent:
         # yfinance uses BRK-B / BF-B for class shares; Alpaca expects BRK.B / BF.B
         if "-" in ticker and len(ticker.rsplit("-", 1)[-1]) == 1:
             ticker = ticker.replace("-", ".")
+        # crypto: yfinance BTC-USD -> Alpaca BTC/USD, and crypto must use GTC (24/7)
+        is_crypto = ticker.endswith("-USD")
+        if is_crypto:
+            ticker = ticker.replace("-USD", "/USD")
 
         side_enum = OrderSide.BUY if side == "buy" else OrderSide.SELL
-        tif_enum  = TimeInForce.DAY if tif == "day" else TimeInForce.GTC
+        tif_enum  = TimeInForce.GTC if is_crypto else (TimeInForce.DAY if tif == "day" else TimeInForce.GTC)
+        notional_tif = TimeInForce.GTC if is_crypto else TimeInForce.DAY
 
         if order_type == "limit":
             if limit_price is None:
@@ -140,10 +145,10 @@ class ExecutionAgent:
                 time_in_force=tif_enum, limit_price=float(limit_price),
             )
         elif notional and notional > 0:
-            # fractional (dollar-sized) market order — Alpaca requires DAY tif
+            # fractional (dollar-sized) market order — equities DAY, crypto GTC
             req = MarketOrderRequest(
                 symbol=ticker, notional=round(float(notional), 2),
-                side=side_enum, time_in_force=TimeInForce.DAY,
+                side=side_enum, time_in_force=notional_tif,
             )
         else:
             req = MarketOrderRequest(

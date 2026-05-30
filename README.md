@@ -61,12 +61,13 @@ passing Sharpe + walk-forward join. **Complete strategy reference (every sleeve,
 overlay & parameter) in [STRATEGIES.md](STRATEGIES.md)**; full numbers in
 [BOARD_SUMMARY.md](BOARD_SUMMARY.md).
 
-**Also researched (no-leverage, not deployed):** options *income* sleeves that
-harvest the volatility risk premium — a cash-secured **put-write** (modeled
-Sharpe 1.26, −11% DD, beats the market in every down/flat year) and a covered
-**call/buy-write** (Sharpe 1.43). Premiums are *modeled* (Black-Scholes + a
-documented IV-vs-realized markup), pending live paper validation — see
-[STRATEGIES.md](STRATEGIES.md) and `runners/options_income.py`.
+**Researched and rejected (no-leverage options income):** a cash-secured
+**put-write** sleeve to harvest the volatility risk premium. Done properly
+(delta-targeted strikes, market-filtered, honest windowing — `options_income_v2.py`)
+it caps at **Sharpe < 1.0 with a −24% to −27% drawdown** at every strike: it would
+break the −15% gate and is 0.76-correlated to SPY. The VRP is real but it's payment
+for selling crash insurance — it *adds* equity-crash exposure rather than diversifying.
+Not deployed. (See [STRATEGIES.md](STRATEGIES.md) for the full analysis.)
 
 > **Honest caveats:** long-only equity book validated over a 2016–2026 bull
 > market — it is not market-neutral. Vol-targeting controls drawdown and the
@@ -111,7 +112,7 @@ $250 no-trade band. `run_rebalance.ps1` wraps this for Windows Task Scheduler.
 | `blended_plus` + full-500 xs + vol-target | 1.44 | 14.5% | −12.7% | no leverage |
 | `regime_adaptive --max-leverage 1.5` | 1.41 | 20.8% | −18.4% | aggressive growth (paper) |
 | `defensive` (+ turn-of-month) | 1.22 | 8.3% | −8.3% | lowest risk |
-| put-write (options income, modeled) | 1.26 | 9.2% | −11.1% | no-leverage defensive income (not deployed) |
+| put-write (options income) | <1.0 | ~5–10% | −25% | rejected: breaks the DD gate (see STRATEGIES.md) |
 
 > **Lean years:** this is a long-biased book — it has softer years in choppy/sideways
 > markets (2018–2020 ≈ +9% total after the recovery sleeve + cash yield). 15–20% is a
