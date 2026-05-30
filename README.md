@@ -183,6 +183,8 @@ quant-agent/
 | `strategy_lab.py` | candidate-strategy correlation lab + blend tuning |
 | `options_income.py` | no-leverage options income (put-write / covered call), modeled vol-risk-premium + VRP sensitivity |
 | `new_sleeves_screen.py` | screens candidate equity sleeves against the gate + marginal book value |
+| `fundamental_screen.py` | live quality/value screen (Finnhub fundamentals) + quality filter for the momentum sleeve |
+| `ml_alpha.py` | walk-forward ML (gradient-boosting) return predictor — benchmarked vs the rule-based sleeve |
 | `dump_daily_trades.py` | per-trade CSV logs |
 | `verify_trades_vs_yfinance.py` | data-integrity audit (fills vs yfinance OHLC) |
 | `data_quality_check.py` / `trade_stats.py` | data + win-rate significance diagnostics |

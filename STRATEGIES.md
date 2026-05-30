@@ -185,6 +185,23 @@ optimizer cannot beat the hand-set weights out-of-sample (avg OOS Sharpe 1.37 op
 vs 1.38 current) and overfits badly (drops RSI-2 to 0.3%). Next gains come from a
 live paper track record + monitoring, not strategy #27.
 
+## Fundamental quality screen (Finnhub) — live tilt, NOT backtested
+New data source: `data/finnhub_fundamentals.py` + `runners/fundamental_screen.py`.
+Pulls current company financials (ROE, net margin, current ratio, debt/equity,
+revenue growth, P/E) and builds a cross-sectional **quality/value composite**
+(mean of signed z-scores). Intended use: a **quality filter on the momentum sleeve**
+("quality momentum" — keep high-momentum names that are *also* high-quality; drop
+the expensive, fragile ones like a P/E-346 momentum chaser).
+
+> **HONEST DATA LIMIT:** Finnhub's free tier returns the *current* fundamental
+> snapshot, **not point-in-time history**. So this is a **live screen/tilt only** —
+> a rigorous backtested fundamental factor needs paid point-in-time data (else
+> look-ahead bias). It is **not deployed** to the live book; it's a tool to
+> rank/filter today's holdings. Wiring it as a live momentum filter is an option
+> pending either paid history or a forward live-validation period.
+
+Run: `python runners\fundamental_screen.py` (default: quality-10 + live momentum picks).
+
 ## Honest caveats
 Long-biased equity book, validated 2016–2026 (one decade, one out-of-sample window).
 Not market-neutral; lean years (2018-style) are cushioned by cash yield + recovery
