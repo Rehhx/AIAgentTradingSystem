@@ -1,79 +1,94 @@
 # Résumé material — Quant-Agent Trading System
 
-Honest, metric-driven copy for a résumé / LinkedIn / portfolio. All figures are
-**backtested (2016–2026) or paper-trading** results — labeled as such so they
-hold up under interview scrutiny. Headline book: 6-sleeve `portfolio_full`,
-vol-targeted (17%, ≤1.8× conditional leverage).
+Honest, metric-driven copy for a résumé / LinkedIn / portfolio. **All figures are
+backtested (2016–2026 deployed window; 2005–2026 for the GFC stress test) or
+paper-trading** — labeled as such so they hold up under interview scrutiny. The
+system is a **two-engine book**: a long-equity *growth* engine + a long/short
+managed-futures *crisis-alpha* engine, each with risk overlays and forward monitoring.
 
 ---
 
 ## Project header
 
-> **Autonomous Multi-Agent Quantitative Trading System** — *Python, Claude Agent SDK, Alpaca, pandas/NumPy*
+> **Two-Engine Systematic Trading System (Equity + Managed Futures)** — *Python, pandas/NumPy, scikit-learn, Alpaca, Claude Agent SDK*
 
 ---
 
-## Full bullets (pick 4–5)
+## Full bullets (pick 5–6)
 
-- Designed and backtested a **six-strategy daily-rebalanced equity ensemble**
-  (mean-reversion, breakout, trend, cross-sectional momentum, recovery-thrust,
-  post-earnings drift) achieving a **1.46 Sharpe, 18.2% annualized return, and
-  −13.1% max drawdown** over a 2016–2026 backtest — **positive in all 5
-  walk-forward folds**.
-- Engineered the full validation stack — **anchored walk-forward analysis with
-  per-fold parameter re-optimization, volatility targeting, risk-parity
-  weighting, and a regime-based early-warning de-risk overlay** — gated by a
-  quantitative risk screen (Sharpe / drawdown / win-rate / trade-count) before
-  any strategy could deploy.
-- Diagnosed and fixed a **data-integrity bug** in which unadjusted
-  split/dividend prices were corrupting backtested fills; cross-validated
-  against an independent source, **lifting the affected book's Sharpe from ~1.09
-  to ~1.32**.
-- Built a **live paper-trading rebalancer** on the Alpaca API with
-  target-vs-current order reconciliation, fractional/notional sizing, no-trade
-  bands, and stale-order cancellation; automated daily pre-market execution via
-  Task Scheduler.
-- Architected a **multi-agent research pipeline** (research → code generation →
-  backtest → risk gate) on the Claude Agent SDK, with an automated
-  validation-retry loop and a persistent ledger of every strategy tested.
-- Established a key research finding: **systematically showed that 1-minute
-  intraday strategies fail to survive realistic 6 bps transaction costs across
-  30+ tested strategies**, then pivoted the system to daily/multi-day holds
-  where the edge persists.
-- Researched **no-leverage options income strategies** (cash-secured put-write,
-  covered call) that harvest the volatility risk premium, modeling premiums via
-  Black-Scholes and stress-testing the implied-vs-realized-vol assumption.
+- Built an **end-to-end systematic trading system** — research → backtest → risk gate
+  → live (paper) execution → monitoring → forward validation — across two uncorrelated
+  engines: a 7-sleeve **equity growth** book (mean-reversion, breakout, trend, cross-
+  sectional momentum, recovery, post-earnings drift, defensive low-vol) and a
+  diversified **long/short managed-futures** book (time-series momentum across 10 asset
+  classes).
+- Backtested the growth book to **Sharpe 1.53–1.69 / 18–22% CAGR / −13% drawdown**
+  (2016–2026) and **stress-tested the full system back to 2005 through the 2008 GFC**,
+  where it lost only −26% vs the S&P's −54% and the managed-futures engine was **+10.7%**.
+- Engineered for **non-stationarity / regime change**: **parameter ensembling** (each
+  sleeve averages 3–5 settings rather than betting on one θ), **diversification across
+  regime-winners** instead of regime-timing (empirically beat a regime-switching model),
+  and **walk-forward + block-bootstrap** validation (3,000 resampled paths; edge positive
+  in 100% of them).
+- Established the project's core finding — **1-minute intraday strategies don't survive
+  realistic transaction costs across 30+ tested strategies** — and pivoted to daily/
+  multi-day holds where the edge persists; quantified the live-vs-backtest gap with a
+  **fill-quality tracker** (real fills ~17 bps vs the 6 bps backtest assumption).
+- Applied **machine learning** (gradient-boosting + logistic) to predict trade success
+  and rank cross-sectional returns; **rigorously found it did not beat the rule-based
+  signals out-of-sample** (AUC ≈ 0.50) — a disciplined negative result that avoided
+  overfitting low-signal financial data.
+- Implemented the full **risk framework**: volatility targeting, regime-based de-risk
+  overlays, single-name concentration caps, idle-cash → T-bills, and an honest
+  worst-case drawdown of **~−32% (2008)** — corrected up from the benign-window −13%.
+- Built **live monitoring + a paper-vs-backtest tracking dashboard** that flags drift,
+  drawdown breaches, and regime-posture mismatches day-by-day (Alpaca paper API).
 
 ---
 
 ## Tight 3-bullet version (space-constrained)
 
-- Built a Python multi-agent quant system that researches, validates, and
-  paper-trades daily equity strategies end-to-end.
-- Backtested a 6-strategy vol-targeted ensemble to **Sharpe 1.46 / 18.2% CAGR /
-  −13.1% max DD**, validated across 5 walk-forward folds with a strict risk gate.
-- Automated live paper execution (Alpaca) with order reconciliation and
-  scheduled daily rebalancing; caught and fixed a price-adjustment data bug that
-  had been corrupting results.
+- Built a two-engine systematic trading system (equity growth + managed-futures
+  crisis-alpha) end-to-end: research, backtest, risk, execution, and live monitoring.
+- Backtested to **Sharpe ~1.5–1.7**, **GFC-stress-tested back to 2005** (−26% in 2008
+  vs the market's −54%), and validated with walk-forward, **block-bootstrap (3,000
+  paths)**, and **parameter ensembling** to guard against regime change / overfitting.
+- Quantified the backtest-vs-live gap with a **fill-quality tracker** and reported the
+  honest cost-adjusted return and **~−32% true worst-case drawdown** — not a flattering
+  paper number.
 
 ---
 
 ## Skills line
 
-> Python · pandas · NumPy · quantitative backtesting · walk-forward validation ·
-> risk management · time-series analysis · REST APIs (Alpaca, yfinance) ·
-> multi-agent LLM orchestration (Claude Agent SDK) · Git
+> Python · pandas · NumPy · scikit-learn · quantitative backtesting · walk-forward &
+> bootstrap validation · regime analysis · risk management (vol-targeting, drawdown
+> control) · managed futures / trend-following · transaction-cost modeling · REST APIs
+> (Alpaca, Finnhub, yfinance) · Git
 
 ---
 
-## Interview tip
+## Your 3 best interview talking points (lead with these)
 
-Lead with the **"intraday doesn't survive costs → daily does"** finding. It's
-the most senior-sounding point here: it shows you can kill your own idea on
-evidence and reason about transaction-cost economics — exactly what quant/eng
-interviewers probe for. Be ready to explain *why* (6 bps round-trip amortizes
-over a multi-week daily hold but dominates a 1-minute signal).
+1. **Killing your own idea on evidence:** *"My core finding was that 1-minute intraday
+   strategies don't survive transaction costs — I proved it across 30+ strategies, then
+   pivoted to daily holds where the edge persists."*
+2. **Engineering for non-stationarity** (the deepest quant problem): *"I don't bet on a
+   single parameter or try to time regimes — I use parameter ensembling, diversify across
+   strategies that each win in different regimes, and validate across the dot-com bust,
+   the GFC, COVID, and 2022 inflation."*
+3. **Backtest-vs-live realism** (what actually gets you hired): *"Paper backtests assume
+   perfect liquidity, so I built a fill-quality tracker — real fills cost ~17 bps vs the
+   6 bps assumed — and I report the cost-adjusted return and the true −32% GFC drawdown,
+   not the flattering figure."*
 
-> **Honesty note:** these are backtested / paper-trading results over one decade
-> and one out-of-sample window, on a long-biased equity book — not live-money,
-> not market-neutral. State that plainly if asked; it reads as rigor, not weakness.
+---
+
+## Honest framing (do not skip)
+
+State results as **backtested / paper research**, never "I made X% with real money."
+The intellectual honesty *is* the differentiator — you rejected ~30 strategies on
+evidence, corrected your own drawdown, killed the ML model when it overfit, and built
+tooling specifically because you knew paper overstates live. An interviewer who catches
+an inflated claim discards the whole résumé; one who sees the rigor and candor remembers
+it. This reads as a *junior-quant-with-senior-instincts* project.
