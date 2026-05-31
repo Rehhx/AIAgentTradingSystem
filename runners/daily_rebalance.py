@@ -93,6 +93,16 @@ BOOKS = {
 
 MF_MARKETS = ["SPY", "QQQ", "EFA", "EEM", "TLT", "IEF", "GLD", "DBC", "UUP", "VNQ"]
 
+# parameter ENSEMBLE: each per-ticker sleeve averages several parameter settings
+# instead of betting on one -> robust to which param the current regime favors
+# (board fix for non-stationarity / overfit-theta; same backtested perf, no theta risk).
+ENSEMBLE_PARAMS = {
+    "rsi2_meanrev": [{"rsi_period": 2, "entry_rsi": e, "exit_rsi": 50, "trend_sma": 100} for e in (20, 25, 30, 35, 40)],
+    "donchian":     [{"entry_lookback": lb, "exit_lookback": 10} for lb in (10, 15, 20, 30, 40)],
+    "trend_5020":   [{"fast": 50, "slow": s} for s in (150, 175, 200, 225, 250)],
+    "recovery":     [{"hold_days": h} for h in (90, 120, 150)],
+}
+
 PEAD_PARAMS = {"gap_pct": 0.05, "vol_mult": 2.0, "hold_days": 60}
 
 # per-regime (per-ticker sleeve weights, xs_dualmom alloc, leverage)
@@ -209,7 +219,7 @@ def target_weights(book: str, universe: list, source: str = "auto",
                    xs_universe: str = "same", vol_target_pct: float = 0.0,
                    max_lev: float = 1.0, park_cash: str = "BIL",
                    early_warning: bool = True, name_cap: float = 0.0,
-                   crypto_weight: float = 0.0) -> tuple[dict, dict, dict]:
+                   crypto_weight: float = 0.0, ensemble: bool = True) -> tuple[dict, dict, dict]:
     """returns (weights, last_price, detail). Per-ticker sleeves give each long
     name alloc/N. The 'xs_dualmom' sleeve ranks a (possibly larger) universe by
     12-1 momentum and gives the top-K names alloc/K (cash when SPY < its 200d
@@ -248,9 +258,13 @@ def target_weights(book: str, universe: list, source: str = "auto",
         last_price[t] = float(d["close"].iloc[-1])
         closes[t] = d["close"]
         for s, alloc in strat_weights.items():
-            pos = ALL_SIGNALS[s](d, DEPLOY_PARAMS.get(s) or None)
-            if float(pos.iloc[-1]) > 0:      # position as of the last close
-                weights[t] += alloc * (1.0 / n)
+            plist = ENSEMBLE_PARAMS.get(s) if ensemble else None
+            if plist:                          # ensemble: fraction of params agreeing today
+                frac = float(np.mean([float(ALL_SIGNALS[s](d, p).iloc[-1]) for p in plist]))
+            else:
+                frac = float(ALL_SIGNALS[s](d, DEPLOY_PARAMS.get(s) or None).iloc[-1])
+            if frac > 0:                       # partial position scales with agreement
+                weights[t] += alloc * (1.0 / n) * frac
                 detail[t].append(s)
 
     # cross-sectional dual-momentum sleeve (rank over `universe` or full S&P 500)
@@ -490,6 +504,8 @@ def main():
                     help="crypto sleeve weight when --crypto-sleeve is set (default 5%%)")
     ap.add_argument("--account", type=int, default=1, choices=[1, 2],
                     help="which Alpaca paper account (1=default keys, 2=ALPACA_*_2 keys)")
+    ap.add_argument("--no-ensemble", action="store_true",
+                    help="disable parameter ensembling (bet on single params instead)")
     args = ap.parse_args()
 
     if args.universe.strip().lower() == "quality":
@@ -518,7 +534,8 @@ def main():
         vol_target_pct=args.vol_target, max_lev=args.max_leverage,
         park_cash=(args.park_cash.strip().upper() or None),
         early_warning=(not args.no_early_warning), name_cap=args.name_cap,
-        crypto_weight=(args.crypto_weight if args.crypto_sleeve else 0.0))
+        crypto_weight=(args.crypto_weight if args.crypto_sleeve else 0.0),
+        ensemble=(not args.no_ensemble))
     equity, esrc = get_equity(agent, args.notional)
     held = current_positions(agent)
 
