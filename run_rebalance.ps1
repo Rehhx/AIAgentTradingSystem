@@ -24,3 +24,8 @@ Set-Location $proj
 "==== $(Get-Date -Format 'HH:mm:ss') | monitor / track-record ====" |
     Out-File -Append -Encoding utf8 $log
 & $py "runners\monitor.py" *>> $log
+
+# live-vs-backtest tracking dashboard (regenerates TRACKING.md)
+"==== $(Get-Date -Format 'HH:mm:ss') | tracking dashboard ====" |
+    Out-File -Append -Encoding utf8 $log
+& $py "runners\tracking_dashboard.py" *>> $log
