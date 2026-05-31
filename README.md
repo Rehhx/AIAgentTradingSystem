@@ -116,7 +116,8 @@ $250 no-trade band. `run_rebalance.ps1` wraps this for Windows Task Scheduler.
 
 > **Lean years:** this is a long-biased book — it has softer years in choppy/sideways
 > markets (2018–2020 ≈ +9% total after the recovery sleeve + cash yield). 15–20% is a
-> multi-year *average*, not a yearly guarantee. See [BOARD_SUMMARY.md](BOARD_SUMMARY.md) §8.
+> multi-year *average*, not a yearly guarantee — and the honest worst case is ~−32% (2008
+> GFC), not −13%. See [BOARD_SUMMARY.md](BOARD_SUMMARY.md) §5–6 (honest caveats & drawdown).
 
 ---
 
