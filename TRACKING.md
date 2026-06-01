@@ -1,4 +1,4 @@
-# Live Paper-vs-Backtest Tracking — 2026-05-31
+# Live Paper-vs-Backtest Tracking — 2026-06-01
 
 Current regime: **BULL_CALM**
 
@@ -7,9 +7,11 @@ Current regime: **BULL_CALM**
 - Expected daily: **+0.070% ± 0.72%**
 - Honest worst-case drawdown: **~−25% (bootstrap p5) / ~−32% (2008 GFC)** — *not* −13.7%
 
-## Live track record
+## Live track record (1 sessions since 2026-05-30)
 
-_Accumulating — 1 session(s) logged. Need ~20+ trading days before live vs expected is statistically meaningful. The monitor appends one row per day._
+- Live cumulative **+0.12%** · realized Sharpe 0.00 · current drawdown 0.0%
+- Expected after 1 days: **+0.07%** (2σ band -1.4% … +1.5%)
+- **Tracking: ON TRACK**
 
 ## Real fill quality (paper vs perfect liquidity)
 - Avg slippage **+16.8 bps** (44 fills) vs backtest's 6 bps assumption · worst +172.9

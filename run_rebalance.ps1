@@ -14,9 +14,13 @@ Set-Location $proj
 "==== $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | daily rebalance (portfolio) ====" |
     Out-File -Append -Encoding utf8 $log
 
+# NO-MARGIN posture (board decision): --max-leverage 1.0 means the vol-target can
+# only DE-RISK (scale <=1.0), never borrow -> the book can never be margin-called.
+# Trailing stop widened to 20% = catastrophe-only (an 8% stop fought the mean-
+# reversion sleeve, which deliberately buys deeper dips). Signal exits do the rest.
 # don't trade on US market holidays could be added here; weekends are excluded by the schedule
 & $py "runners\daily_rebalance.py" --book portfolio_full --xs-universe sp500 `
-      --vol-target 0.17 --max-leverage 1.8 --crypto-sleeve --trail-pct 8 --live *>> $log
+      --vol-target 0.17 --max-leverage 1.0 --crypto-sleeve --trail-pct 20 --live *>> $log
 
 "==== exit code $LASTEXITCODE ====" | Out-File -Append -Encoding utf8 $log
 

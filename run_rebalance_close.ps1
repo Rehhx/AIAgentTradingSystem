@@ -15,8 +15,10 @@ Set-Location $proj
 "==== $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | close-run rebalance ====" |
     Out-File -Append -Encoding utf8 $log
 
+# NO-MARGIN posture: --max-leverage 1.0 (vol-target de-risks only, never borrows)
+# + 20% catastrophe-only trailing stop. See run_rebalance.ps1 for the rationale.
 & $py "runners\daily_rebalance.py" --book portfolio_full --xs-universe sp500 `
-      --vol-target 0.17 --max-leverage 1.8 --crypto-sleeve --trail-pct 8 --live *>> $log
+      --vol-target 0.17 --max-leverage 1.0 --crypto-sleeve --trail-pct 20 --live *>> $log
 
 "==== exit code $LASTEXITCODE ====" | Out-File -Append -Encoding utf8 $log
 
