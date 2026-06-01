@@ -88,24 +88,49 @@ def compute_signals(book, xs_universe, vol_target, max_lev, crypto_weight, name_
                           early_warning=True, name_cap=name_cap, crypto_weight=crypto_weight, ensemble=True)
 
 
-def reconcile(weights, last_price, held, equity, band=250.0):
-    out = []
+DISPLAY_COLS = ["Symbol", "Action", "Why", "Target %", "Current $", "Target $", "Delta $"]
+
+
+def reconcile(weights, last_price, held, equity, band=250.0, whole_shares=False):
+    """Target weights vs current positions -> orders. Mirrors the CLI rebalancer:
+    any SHORT (negative weight or short position) uses WHOLE-SHARE qty orders
+    (Alpaca forbids fractional shorts); long-only books use fractional notional.
+    Each row carries the exact order spec in _side/_qty/_notional."""
+    rows = []
     for t in sorted(set(t for t, w in weights.items() if abs(w) > 1e-9) | set(held)):
         w = weights.get(t, 0.0); cur_sh = float(held.get(t, 0.0)); px = last_price.get(t)
-        cur_d = cur_sh * px if px else 0.0; tgt_d = w * equity; delta = tgt_d - cur_d
-        if abs(w) < 1e-9 and cur_sh != 0:
-            act, why = "SELL", "signal exited — strategy no longer holds this"
-        elif cur_sh == 0 and abs(w) > 1e-9:
-            act, why = "BUY", "new signal"
+        cur_d = cur_sh * px if px else 0.0
+        tgt_d = w * equity
+        delta = tgt_d - cur_d
+        ws = whole_shares or w < 0 or cur_sh < 0            # short anywhere -> whole-share only
+        side = qty = notional = None
+        if abs(w) < 1e-9 and cur_sh != 0:                   # close out / cover
+            side = "sell" if cur_sh > 0 else "buy"
+            act = "SELL" if cur_sh > 0 else "BUY"
+            why = "signal exited — close long" if cur_sh > 0 else "signal exited — cover short"
+            qty = abs(int(cur_sh)) if ws else abs(cur_sh)   # whole vs fractional full close
+            if ws and qty == 0:
+                act, why, side = "HOLD", "sub-1-share residual", None
         elif px is None:
-            act, why = "SELL", "held but no live signal — close"
+            side = "sell" if cur_sh > 0 else "buy"
+            act = "SELL" if cur_sh > 0 else "BUY"; why = "held, no live signal — close"
+            qty = abs(int(cur_sh)) if ws else abs(cur_sh)
         elif abs(delta) >= band:
-            act, why = ("ADD", "below target — top up") if delta > 0 else ("TRIM", "above target — trim")
+            act = "BUY" if delta > 0 else "SELL"
+            side = "buy" if delta > 0 else "sell"
+            why = "below target — add" if delta > 0 else "above target — reduce"
+            if ws:
+                qty = abs(int(delta / px)) if px else 0
+                if qty == 0:
+                    act, why, side = "HOLD", "below 1 share", None
+            else:
+                notional = round(abs(delta), 2)
         else:
             act, why = "HOLD", "in signal, within band"
-        out.append({"Symbol": t, "Action": act, "Why": why, "Target %": round(w * 100, 2),
-                    "Current $": round(cur_d, 0), "Target $": round(tgt_d, 0), "Delta $": round(delta, 0)})
-    return pd.DataFrame(out)
+        rows.append({"Symbol": t, "Action": act, "Why": why, "Target %": round(w * 100, 2),
+                     "Current $": round(cur_d, 0), "Target $": round(tgt_d, 0), "Delta $": round(delta, 0),
+                     "_side": side, "_qty": qty, "_notional": notional})
+    return pd.DataFrame(rows)
 
 
 def margin_of(a):
@@ -116,21 +141,27 @@ def margin_of(a):
 # execution (shared by the manual button and auto-pilot)
 # --------------------------------------------------------------------------- #
 def submit_reconcile_orders(ag, orders, acc, trail):
-    """Cancel stale opens, submit each reconcile order, re-arm stops. Returns a log."""
+    """Cancel stale opens, submit each order using its precomputed spec
+    (_side/_qty/_notional), re-arm stops. Returns a log."""
     try:
         ag.client.cancel_orders()
     except Exception:
         pass
-    held = {p["symbol"]: p["qty"] for p in ag.get_positions()}
     log = []
     for _, r in orders.iterrows():
-        t, act, d = r["Symbol"], r["Action"], r["Delta $"]
-        side = "buy" if d > 0 else "sell"
-        sig = ({"ticker": t, "side": "sell", "qty": abs(float(held.get(t, 0)))} if act == "SELL"
-               else {"ticker": t, "side": side, "notional": round(abs(d), 2)})
+        if not r.get("_side"):
+            continue
+        sig = {"ticker": r["Symbol"], "side": r["_side"]}
+        if r.get("_qty") is not None and not pd.isna(r["_qty"]):
+            sig["qty"] = float(r["_qty"])
+        elif r.get("_notional") is not None and not pd.isna(r["_notional"]):
+            sig["notional"] = float(r["_notional"])
+        else:
+            continue
         res = ag.run({"payload": {"signal": {**sig, "order_type": "market", "time_in_force": "day"}},
                       "strategy_id": f"dashboard_{ACCOUNT_BOOK.get(acc, 'x')}"})
-        log.append(f"{side.upper()} {t} → {res.get('fill', {}).get('status', res.get('reason'))}")
+        amt = f"{sig['qty']:g} sh" if "qty" in sig else f"${sig['notional']:,.0f}"
+        log.append(f"{r['_side'].upper()} {amt} {r['Symbol']} → {res.get('fill', {}).get('status', res.get('reason'))}")
     if trail and trail > 0 and acc == 1 and hasattr(ag, "sync_trailing_stops"):
         ag.sync_trailing_stops(trail_pct=float(trail))
         log.append(f"trailing stops re-armed @ {trail}%")
@@ -300,7 +331,8 @@ with tab_live:
                     weights, last_price, _ = compute_signals(book, xu, vol_target, ml, cw, 0.10, str(datetime.now().date()))
                     a = account_dict(agent)
                     held = {p["symbol"]: p["qty"] for p in agent.get_positions()}
-                    st.session_state[f"plan{account}"] = reconcile(weights, last_price, held, a["equity"])
+                    st.session_state[f"plan{account}"] = reconcile(weights, last_price, held, a["equity"],
+                                                                    whole_shares=(account == 2))
                     try:
                         st.session_state[f"regime{account}"] = _detect_regime("auto")
                     except Exception:
@@ -329,10 +361,11 @@ with tab_live:
                 st.success("✅ No exits pending, no deep losers, not bearish — aligned with the strategy.")
             counts = plan["Action"].value_counts().to_dict()
             st.caption(" · ".join(f"**{k}**: {v}" for k, v in counts.items()))
-            color = {"SELL": "#dc2626", "TRIM": "#f59e0b", "BUY": "#16a34a", "ADD": "#2563eb", "HOLD": "#6b7280"}
-            st.dataframe(plan.style.map(lambda v: f"background-color:{color.get(v,'')}22;color:{color.get(v,'inherit')};font-weight:600",
-                                        subset=["Action"]), width='stretch', hide_index=True)
-            orders = plan[plan["Action"].isin(["BUY", "SELL", "TRIM", "ADD"])]
+            color = {"SELL": "#dc2626", "BUY": "#16a34a", "HOLD": "#6b7280"}
+            st.dataframe(plan[DISPLAY_COLS].style.map(
+                lambda v: f"background-color:{color.get(v,'')}22;color:{color.get(v,'inherit')};font-weight:600",
+                subset=["Action"]), width='stretch', hide_index=True)
+            orders = plan[plan["_side"].notna()]
             st.markdown(f"**Execute — {len(orders)} order(s)**")
             if autopilot:
                 autopilot_execute(agent, orders, account, trail_pct)
@@ -417,12 +450,14 @@ with tab_deploy:
             cw = 0.05 if crypto else 0.0
             w1, lp1, _ = compute_signals("portfolio_full", "sp500", vol_target, max_lev, cw, 0.10, str(datetime.now().date()))
             ag1 = get_agent(1); a1 = account_dict(ag1)
-            plans[1] = reconcile(w1, lp1, {p["symbol"]: p["qty"] for p in ag1.get_positions()}, a1["equity"])
-        # acct 2
+            plans[1] = reconcile(w1, lp1, {p["symbol"]: p["qty"] for p in ag1.get_positions()}, a1["equity"],
+                                 whole_shares=False)
+        # acct 2 — managed futures uses whole-share orders (shorts can't be fractional)
         with st.spinner("acct 2 — managed futures…"):
             w2, lp2, _ = compute_signals("managed_futures", "same", 0.12, 1.5, 0.0, 0.0, str(datetime.now().date()))
             ag2 = get_agent(2); a2 = account_dict(ag2)
-            plans[2] = reconcile(w2, lp2, {p["symbol"]: p["qty"] for p in ag2.get_positions()}, a2["equity"])
+            plans[2] = reconcile(w2, lp2, {p["symbol"]: p["qty"] for p in ag2.get_positions()}, a2["equity"],
+                                 whole_shares=True)
         # acct 3 — LEAPS preview
         with st.spinner("acct 3 — LEAPS preview…"):
             ag3 = get_agent(3); a3 = account_dict(ag3)
@@ -433,9 +468,9 @@ with tab_deploy:
         plans = st.session_state["deploy_plans"]
         for acc in (1, 2):
             plan = plans[acc]
-            orders = plan[plan["Action"].isin(["BUY", "SELL", "TRIM", "ADD"])]
+            orders = plan[plan["_side"].notna()]
             with st.expander(f"Account #{acc} — {ACCOUNTS[acc]} · {len(orders)} order(s)", expanded=True):
-                st.dataframe(plan, width='stretch', hide_index=True)
+                st.dataframe(plan[DISPLAY_COLS], width='stretch', hide_index=True)
                 manual_execute_ui(get_agent(acc), orders, acc, trail_pct, key=f"deploy{acc}")
 
         # acct 3 LEAPS
