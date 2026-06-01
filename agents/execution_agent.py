@@ -121,6 +121,56 @@ class ExecutionAgent:
             self.log.exception(f"get_positions failed: {e}")
             return []
 
+    def sync_trailing_stops(self, trail_pct: float = 8.0) -> None:
+        """Place a GTC trailing-stop-sell on every long equity position that
+        doesn't already have one.  Skip cash ETFs, crypto, and short positions.
+        Safe to call multiple times — checks existing open orders first."""
+        if self.simulated or self.client is None:
+            return
+        # cash/T-bill ETFs and crypto never get a trailing stop
+        SKIP = {"BIL", "SHV", "SGOV", "TBIL", "CSHI"}
+        try:
+            from alpaca.trading.requests import TrailingStopOrderRequest, GetOrdersRequest
+            from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
+
+            open_orders = self.client.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN))
+            # symbols that already have a trailing-stop sell open — don't double up
+            covered = {
+                str(o.symbol)
+                for o in open_orders
+                if str(getattr(o, "order_type", "")).lower() == "trailing_stop"
+                and str(getattr(o, "side", "")).lower() == "sell"
+            }
+
+            positions = self.client.get_all_positions()
+            placed, skipped = 0, 0
+            for p in positions:
+                sym = str(p.symbol)
+                qty = float(p.qty)
+                if qty <= 0:                         # short position — skip
+                    skipped += 1; continue
+                if sym in SKIP or "/" in sym:        # cash ETF or crypto — skip
+                    skipped += 1; continue
+                if sym in covered:                   # stop already live — skip
+                    skipped += 1; continue
+                try:
+                    req = TrailingStopOrderRequest(
+                        symbol=sym, qty=qty,
+                        side=OrderSide.SELL,
+                        time_in_force=TimeInForce.GTC,
+                        trail_percent=trail_pct,
+                    )
+                    self.client.submit_order(req)
+                    placed += 1
+                    self.log.info(f"trailing stop | {sym} {qty:.4g}sh @{trail_pct}% trail")
+                except Exception as e:
+                    self.log.warning(f"trailing stop failed for {sym}: {e}")
+
+            print(f"  [trailing-stops] {placed} new @{trail_pct}% trail "
+                  f"({skipped} already covered/skipped)")
+        except Exception as e:
+            self.log.exception(f"sync_trailing_stops failed: {e}")
+
     # ------------------------------------------------------------------
     # internals
     # ------------------------------------------------------------------

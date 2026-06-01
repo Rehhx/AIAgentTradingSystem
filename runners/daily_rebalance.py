@@ -506,6 +506,8 @@ def main():
                     help="which Alpaca paper account (1=default keys, 2=ALPACA_*_2 keys)")
     ap.add_argument("--no-ensemble", action="store_true",
                     help="disable parameter ensembling (bet on single params instead)")
+    ap.add_argument("--trail-pct", type=float, default=8.0,
+                    help="trailing-stop percent on long positions after rebalance (0 = off)")
     args = ap.parse_args()
 
     if args.universe.strip().lower() == "quality":
@@ -617,6 +619,10 @@ def main():
         status = res.get("fill", {}).get("status", res.get("reason"))
         amt = f"{o['qty']:>7g} sh" if "qty" in o else f"${o['notional']:>8,.0f}"
         print(f"  {o['side'].upper():4s} {amt} {o['ticker']:6s} -> {status}")
+
+    if args.trail_pct > 0 and args.book != "managed_futures":
+        print(f"\nSyncing trailing stops ({args.trail_pct}%)...")
+        agent.sync_trailing_stops(trail_pct=args.trail_pct)
 
 
 if __name__ == "__main__":

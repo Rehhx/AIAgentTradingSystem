@@ -16,7 +16,7 @@ Set-Location $proj
 
 # don't trade on US market holidays could be added here; weekends are excluded by the schedule
 & $py "runners\daily_rebalance.py" --book portfolio_full --xs-universe sp500 `
-      --vol-target 0.17 --max-leverage 1.8 --crypto-sleeve --live *>> $log
+      --vol-target 0.17 --max-leverage 1.8 --crypto-sleeve --trail-pct 8 --live *>> $log
 
 "==== exit code $LASTEXITCODE ====" | Out-File -Append -Encoding utf8 $log
 
