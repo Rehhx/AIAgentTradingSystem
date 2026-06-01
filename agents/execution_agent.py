@@ -134,13 +134,20 @@ class ExecutionAgent:
             from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
 
             open_orders = self.client.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN))
-            # symbols that already have a trailing-stop sell open — don't double up
-            covered = {
-                str(o.symbol)
-                for o in open_orders
-                if str(getattr(o, "order_type", "")).lower() == "trailing_stop"
-                and str(getattr(o, "side", "")).lower() == "sell"
-            }
+
+            # cancel ALL existing trailing-stop sells so we can re-place them
+            # sized to the current position (position may have changed since last run)
+            cancelled = 0
+            for o in open_orders:
+                if (str(getattr(o, "order_type", "")).lower() == "trailing_stop"
+                        and str(getattr(o, "side", "")).lower() == "sell"):
+                    try:
+                        self.client.cancel_order_by_id(str(o.id))
+                        cancelled += 1
+                    except Exception as e:
+                        self.log.warning(f"could not cancel trailing stop {o.id}: {e}")
+            if cancelled:
+                self.log.info(f"cancelled {cancelled} stale trailing stop(s) before re-placing")
 
             positions = self.client.get_all_positions()
             placed, skipped = 0, 0
@@ -153,8 +160,6 @@ class ExecutionAgent:
                 if qty <= 0:                         # short, sub-1-share, or fully held — skip
                     skipped += 1; continue
                 if sym in SKIP or "/" in sym:        # cash ETF or crypto — skip
-                    skipped += 1; continue
-                if sym in covered:                   # stop already live — skip
                     skipped += 1; continue
                 try:
                     req = TrailingStopOrderRequest(
@@ -169,8 +174,8 @@ class ExecutionAgent:
                 except Exception as e:
                     self.log.warning(f"trailing stop failed for {sym}: {e}")
 
-            print(f"  [trailing-stops] {placed} new @{trail_pct}% trail "
-                  f"({skipped} already covered/skipped)")
+            print(f"  [trailing-stops] cancelled {cancelled} stale | placed {placed} new "
+                  f"@{trail_pct}% trail ({skipped} skipped)")
         except Exception as e:
             self.log.exception(f"sync_trailing_stops failed: {e}")
 
