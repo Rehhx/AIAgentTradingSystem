@@ -31,7 +31,20 @@ ALPACA_API_SECRET = os.getenv("ALPACA_API_SECRET", "")
 # second paper account — run two books in parallel (daily_rebalance --account 2)
 ALPACA_API_KEY_2    = os.getenv("ALPACA_API_KEY_2", "")
 ALPACA_API_SECRET_2 = os.getenv("ALPACA_API_SECRET_2", "")
+# third paper account — options / LEAPS book (daily_rebalance --account 3).
+# REQUIRES options trading approved on this Alpaca paper account.
+ALPACA_API_KEY_3    = os.getenv("ALPACA_API_KEY_3", "")
+ALPACA_API_SECRET_3 = os.getenv("ALPACA_API_SECRET_3", "")
 ALPACA_PAPER      = True   # always True until we deliberately go live
+
+
+def alpaca_keys(account: int) -> tuple[str, str]:
+    """(key, secret) for paper account 1/2/3. Blank -> ExecutionAgent goes simulated."""
+    return {
+        1: (ALPACA_API_KEY,   ALPACA_API_SECRET),
+        2: (ALPACA_API_KEY_2, ALPACA_API_SECRET_2),
+        3: (ALPACA_API_KEY_3, ALPACA_API_SECRET_3),
+    }.get(account, (ALPACA_API_KEY, ALPACA_API_SECRET))
 
 # ---------------------------------------------------------------------------
 # anthropic (claude agents)

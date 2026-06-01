@@ -37,6 +37,14 @@ from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
 log = logging.getLogger("execution_agent")
 
 
+def _parse_date(d):
+    """Alpaca returns expiration_date as a date or 'YYYY-MM-DD' string."""
+    from datetime import date, datetime as _dt
+    if isinstance(d, date):
+        return d
+    return _dt.strptime(str(d), "%Y-%m-%d").date()
+
+
 class ExecutionAgent:
     """matches BaseAgent.run(task) contract used by orchestrator."""
 
@@ -120,6 +128,106 @@ class ExecutionAgent:
         except Exception as e:
             self.log.exception(f"get_positions failed: {e}")
             return []
+
+    # ------------------------------------------------------------------
+    # OPTIONS (account 3 — defined-risk LEAPS). Requires options trading
+    # approved on the Alpaca account. All methods fail soft with a reason.
+    # ------------------------------------------------------------------
+    def find_leaps_contract(self, underlying: str, moneyness: float = 0.90,
+                            dte_min: int = 300, dte_max: int = 540) -> dict:
+        """Pick a deep-ITM (~0.8 delta) long-dated CALL for share-replacement:
+        strike ~= moneyness*spot, expiry ~1yr out. Returns a dict with the OCC
+        symbol, strike, expiry, and (if available) the latest quote/mid price."""
+        if self.simulated or self.client is None:
+            return {"ok": False, "reason": "simulated — no Alpaca client"}
+        try:
+            from datetime import date, timedelta
+            from alpaca.trading.requests import GetOptionContractsRequest
+            from alpaca.trading.enums import ContractType, AssetStatus
+
+            # current spot from the latest trade of the underlying
+            spot = self._underlying_price(underlying)
+            if not spot:
+                return {"ok": False, "reason": f"no spot price for {underlying}"}
+            target_strike = moneyness * spot
+            today = date.today()
+            req = GetOptionContractsRequest(
+                underlying_symbols=[underlying],
+                status=AssetStatus.ACTIVE,
+                type=ContractType.CALL,
+                expiration_date_gte=today + timedelta(days=dte_min),
+                expiration_date_lte=today + timedelta(days=dte_max),
+                strike_price_gte=str(round(target_strike * 0.92, 2)),
+                strike_price_lte=str(round(target_strike * 1.05, 2)),
+                limit=200,
+            )
+            res = self.client.get_option_contracts(req)
+            contracts = getattr(res, "option_contracts", res) or []
+            if not contracts:
+                return {"ok": False, "reason": f"no LEAPS contracts found for {underlying} "
+                        f"(need ~{dte_min}-{dte_max} DTE near strike {target_strike:.0f})"}
+            # closest strike to target, then longest-dated
+            best = min(contracts, key=lambda c: (abs(float(c.strike_price) - target_strike),
+                                                 -(_parse_date(c.expiration_date) - today).days))
+            quote = self.option_quote(best.symbol)
+            return {"ok": True, "symbol": best.symbol, "underlying": underlying,
+                    "strike": float(best.strike_price), "expiry": str(best.expiration_date),
+                    "spot": spot, "mid": quote.get("mid"), "ask": quote.get("ask")}
+        except Exception as e:
+            return {"ok": False, "reason": f"contract lookup failed: {e}"}
+
+    def _underlying_price(self, symbol: str) -> float | None:
+        try:
+            from alpaca.data.historical.stock import StockHistoricalDataClient
+            from alpaca.data.requests import StockLatestTradeRequest
+            from config import ALPACA_API_KEY, ALPACA_API_SECRET
+            dc = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
+            t = dc.get_stock_latest_trade(StockLatestTradeRequest(symbol_or_symbols=symbol))
+            return float(t[symbol].price)
+        except Exception:
+            try:
+                import yfinance as yf
+                return float(yf.Ticker(symbol).history(period="5d")["Close"].iloc[-1])
+            except Exception:
+                return None
+
+    def option_quote(self, option_symbol: str) -> dict:
+        """Latest bid/ask/mid for an option symbol (empty dict if unavailable)."""
+        if self.simulated or self.client is None:
+            return {}
+        try:
+            from alpaca.data.historical.option import OptionHistoricalDataClient
+            from alpaca.data.requests import OptionLatestQuoteRequest
+            from config import ALPACA_API_KEY, ALPACA_API_SECRET
+            dc = OptionHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
+            q = dc.get_option_latest_quote(OptionLatestQuoteRequest(symbol_or_symbols=option_symbol))
+            o = q[option_symbol]
+            bid, ask = float(o.bid_price or 0), float(o.ask_price or 0)
+            mid = (bid + ask) / 2 if bid and ask else (ask or bid or None)
+            return {"bid": bid, "ask": ask, "mid": mid}
+        except Exception:
+            return {}
+
+    def submit_option(self, option_symbol: str, qty: int, side: str = "buy") -> dict:
+        """Submit a market order for an OPTION contract (qty = # contracts).
+        Gated by the caller — this only fires when explicitly invoked."""
+        if self.simulated or self.client is None:
+            return self._failure("simulated — option order not sent")
+        try:
+            from alpaca.trading.requests import MarketOrderRequest
+            from alpaca.trading.enums import OrderSide, TimeInForce
+            req = MarketOrderRequest(
+                symbol=option_symbol, qty=int(qty),
+                side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
+                time_in_force=TimeInForce.DAY,
+            )
+            order = self.client.submit_order(req)
+            return self._success(fill={"ticker": option_symbol, "side": side, "qty": int(qty),
+                                       "order_id": str(order.id),
+                                       "status": str(getattr(order, "status", "submitted")),
+                                       "mode": "alpaca_paper_option"})
+        except Exception as e:
+            return self._failure(f"option order failed: {e}")
 
     def sync_trailing_stops(self, trail_pct: float = 8.0) -> None:
         """Place a GTC trailing-stop-sell on every long equity position that

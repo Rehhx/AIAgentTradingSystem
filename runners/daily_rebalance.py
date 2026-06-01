@@ -502,8 +502,8 @@ def main():
                     help="OPT-IN: enable the BTC/ETH momentum sleeve (needs board sign-off)")
     ap.add_argument("--crypto-weight", type=float, default=0.05,
                     help="crypto sleeve weight when --crypto-sleeve is set (default 5%%)")
-    ap.add_argument("--account", type=int, default=1, choices=[1, 2],
-                    help="which Alpaca paper account (1=default keys, 2=ALPACA_*_2 keys)")
+    ap.add_argument("--account", type=int, default=1, choices=[1, 2, 3],
+                    help="which Alpaca paper account (1=default, 2=ALPACA_*_2, 3=ALPACA_*_3 options)")
     ap.add_argument("--no-ensemble", action="store_true",
                     help="disable parameter ensembling (bet on single params instead)")
     ap.add_argument("--trail-pct", type=float, default=8.0,
@@ -520,9 +520,10 @@ def main():
     print(f"\nDaily rebalance | book={args.book} | {mode}")
     print(f"Universe ({len(universe)}): {', '.join(universe)}\n")
 
-    if args.account == 2:
-        from config import ALPACA_API_KEY_2, ALPACA_API_SECRET_2
-        agent = ExecutionAgent(api_key=ALPACA_API_KEY_2, api_secret=ALPACA_API_SECRET_2)
+    if args.account in (2, 3):
+        from config import alpaca_keys
+        k, s = alpaca_keys(args.account)
+        agent = ExecutionAgent(api_key=k, api_secret=s)
     else:
         agent = ExecutionAgent()
     print(f"Alpaca account: #{args.account}")
