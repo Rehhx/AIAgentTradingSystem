@@ -146,8 +146,8 @@ class ExecutionAgent:
             placed, skipped = 0, 0
             for p in positions:
                 sym = str(p.symbol)
-                qty = float(p.qty)
-                if qty <= 0:                         # short position — skip
+                qty = int(float(p.qty))              # floor to whole shares (GTC requires integer qty)
+                if qty <= 0:                         # short or sub-1-share fractional — skip
                     skipped += 1; continue
                 if sym in SKIP or "/" in sym:        # cash ETF or crypto — skip
                     skipped += 1; continue
@@ -162,7 +162,7 @@ class ExecutionAgent:
                     )
                     self.client.submit_order(req)
                     placed += 1
-                    self.log.info(f"trailing stop | {sym} {qty:.4g}sh @{trail_pct}% trail")
+                    self.log.info(f"trailing stop | {sym} {qty}sh @{trail_pct}% trail")
                 except Exception as e:
                     self.log.warning(f"trailing stop failed for {sym}: {e}")
 
