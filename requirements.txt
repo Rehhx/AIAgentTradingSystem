@@ -20,6 +20,9 @@ alpaca-py>=0.20.0
 # claude agent sdk (research + autonomous + code agents)
 claude-agent-sdk>=0.1.0
 
+# interactive dashboard / control panel (app/dashboard.py)
+streamlit>=1.40.0        # run with: streamlit run app/dashboard.py
+
 # utilities
 python-dotenv>=1.0.0     # for .env API key management
 tqdm>=4.66.0             # progress bars for data loading
