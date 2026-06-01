@@ -146,8 +146,11 @@ class ExecutionAgent:
             placed, skipped = 0, 0
             for p in positions:
                 sym = str(p.symbol)
-                qty = int(float(p.qty))              # floor to whole shares (GTC requires integer qty)
-                if qty <= 0:                         # short or sub-1-share fractional — skip
+                # use qty_available (total minus shares locked in pending orders)
+                # so we don't over-request shares already held for other orders
+                avail = getattr(p, "qty_available", None)
+                qty = int(float(avail if avail is not None else p.qty))
+                if qty <= 0:                         # short, sub-1-share, or fully held — skip
                     skipped += 1; continue
                 if sym in SKIP or "/" in sym:        # cash ETF or crypto — skip
                     skipped += 1; continue
