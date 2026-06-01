@@ -100,7 +100,8 @@ class ExecutionAgent:
         else:
             try:
                 fill = self._submit_alpaca(ticker, side, qty, notional, order_type,
-                                           tif, sig.get("limit_price"))
+                                           tif, sig.get("limit_price"),
+                                           extended_hours=bool(sig.get("extended_hours", False)))
             except Exception as e:
                 self.log.exception(f"alpaca order failed: {e}")
                 return self._failure(f"alpaca submit error: {e}")
@@ -291,7 +292,8 @@ class ExecutionAgent:
     # internals
     # ------------------------------------------------------------------
 
-    def _submit_alpaca(self, ticker, side, qty, notional, order_type, tif, limit_price):
+    def _submit_alpaca(self, ticker, side, qty, notional, order_type, tif, limit_price,
+                       extended_hours=False):
         from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
         from alpaca.trading.enums import OrderSide, TimeInForce
 
@@ -303,16 +305,24 @@ class ExecutionAgent:
         if is_crypto:
             ticker = ticker.replace("-USD", "/USD")
 
+        # extended hours (pre/post market) is equities-only and REQUIRES a DAY limit
+        # order (Alpaca rejects market or notional/fractional orders in ext hours).
+        ext = bool(extended_hours) and not is_crypto
+
         side_enum = OrderSide.BUY if side == "buy" else OrderSide.SELL
         tif_enum  = TimeInForce.GTC if is_crypto else (TimeInForce.DAY if tif == "day" else TimeInForce.GTC)
         notional_tif = TimeInForce.GTC if is_crypto else TimeInForce.DAY
+
+        if ext and order_type != "limit":
+            raise ValueError("extended-hours orders must be limit orders with a limit_price")
 
         if order_type == "limit":
             if limit_price is None:
                 raise ValueError("limit_price required for limit orders")
             req = LimitOrderRequest(
                 symbol=ticker, qty=qty, side=side_enum,
-                time_in_force=tif_enum, limit_price=float(limit_price),
+                time_in_force=TimeInForce.DAY if ext else tif_enum,
+                limit_price=float(limit_price), extended_hours=ext,
             )
         elif notional and notional > 0:
             # fractional (dollar-sized) market order — equities DAY, crypto GTC

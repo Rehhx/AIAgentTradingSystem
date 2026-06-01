@@ -129,7 +129,7 @@ def reconcile(weights, last_price, held, equity, band=250.0, whole_shares=False)
             act, why = "HOLD", "in signal, within band"
         rows.append({"Symbol": t, "Action": act, "Why": why, "Target %": round(w * 100, 2),
                      "Current $": round(cur_d, 0), "Target $": round(tgt_d, 0), "Delta $": round(delta, 0),
-                     "_side": side, "_qty": qty, "_notional": notional})
+                     "_side": side, "_qty": qty, "_notional": notional, "_px": px})
     return pd.DataFrame(rows)
 
 
@@ -140,9 +140,10 @@ def margin_of(a):
 # --------------------------------------------------------------------------- #
 # execution (shared by the manual button and auto-pilot)
 # --------------------------------------------------------------------------- #
-def submit_reconcile_orders(ag, orders, acc, trail):
+def submit_reconcile_orders(ag, orders, acc, trail, ext_hours=False, limit_buffer=0.005):
     """Cancel stale opens, submit each order using its precomputed spec
-    (_side/_qty/_notional), re-arm stops. Returns a log."""
+    (_side/_qty/_notional), re-arm stops. When ext_hours, send DAY limit orders
+    with extended_hours=True (whole-share; needs _px). Returns a log."""
     try:
         ag.client.cancel_orders()
     except Exception:
@@ -151,48 +152,63 @@ def submit_reconcile_orders(ag, orders, acc, trail):
     for _, r in orders.iterrows():
         if not r.get("_side"):
             continue
-        sig = {"ticker": r["Symbol"], "side": r["_side"]}
-        if r.get("_qty") is not None and not pd.isna(r["_qty"]):
+        sig = {"ticker": r["Symbol"], "side": r["_side"], "time_in_force": "day"}
+        px = r.get("_px")
+        if ext_hours and r.get("_qty") is not None and not pd.isna(r["_qty"]) and px:
             sig["qty"] = float(r["_qty"])
-        elif r.get("_notional") is not None and not pd.isna(r["_notional"]):
-            sig["notional"] = float(r["_notional"])
+            sig["order_type"] = "limit"
+            sig["extended_hours"] = True
+            sig["limit_price"] = round(px * (1 + limit_buffer) if r["_side"] == "buy"
+                                       else px * (1 - limit_buffer), 2)
         else:
-            continue
-        res = ag.run({"payload": {"signal": {**sig, "order_type": "market", "time_in_force": "day"}},
+            sig["order_type"] = "market"
+            if r.get("_qty") is not None and not pd.isna(r["_qty"]):
+                sig["qty"] = float(r["_qty"])
+            elif r.get("_notional") is not None and not pd.isna(r["_notional"]):
+                sig["notional"] = float(r["_notional"])
+            else:
+                continue
+        res = ag.run({"payload": {"signal": sig},
                       "strategy_id": f"dashboard_{ACCOUNT_BOOK.get(acc, 'x')}"})
         amt = f"{sig['qty']:g} sh" if "qty" in sig else f"${sig['notional']:,.0f}"
-        log.append(f"{r['_side'].upper()} {amt} {r['Symbol']} → {res.get('fill', {}).get('status', res.get('reason'))}")
+        tag = f" [ext-hrs limit @{sig['limit_price']}]" if sig.get("extended_hours") else ""
+        log.append(f"{r['_side'].upper()} {amt} {r['Symbol']}{tag} → {res.get('fill', {}).get('status', res.get('reason'))}")
     if trail and trail > 0 and acc == 1 and hasattr(ag, "sync_trailing_stops"):
         ag.sync_trailing_stops(trail_pct=float(trail))
         log.append(f"trailing stops re-armed @ {trail}%")
     return log
 
 
-def manual_execute_ui(ag, orders, acc, trail, key):
+def manual_execute_ui(ag, orders, acc, trail, key, ext_hours=False, limit_buffer=0.005):
     """Gated manual execute: authorize checkbox + button (the inline feature)."""
     if ag.simulated:
         st.info("Simulated — add keys to `.env` to execute."); return
     if len(orders) == 0:
         st.success("Already aligned — nothing to do."); return
+    if ext_hours:
+        st.warning("🌙 Extended-hours: whole-share DAY limit orders (pre/post market). Thin liquidity — "
+                   "fills may be partial or miss. No daily-signal edge; use deliberately.")
     st.error(f"LIVE orders hit Alpaca paper account #{acc}. Review the plan above first.")
     ok = st.checkbox(f"I authorize LIVE orders for account #{acc}", key=f"{key}_auth")
     if st.button(f"🚀 Execute account #{acc} now", disabled=not ok, key=f"{key}_exec"):
         with st.spinner("submitting…"):
-            log = submit_reconcile_orders(ag, orders, acc, trail)
+            log = submit_reconcile_orders(ag, orders, acc, trail, ext_hours=ext_hours, limit_buffer=limit_buffer)
         st.success(f"Account #{acc}: {len(orders)} order(s) submitted."); st.code("\n".join(log))
 
 
-def autopilot_execute(ag, orders, acc, trail):
-    """Autonomous live execute, with guardrails: market-open gate, dedupe by plan
-    hash (won't repeat the same plan), and a 60%-of-equity safety cap."""
+def autopilot_execute(ag, orders, acc, trail, ext_hours=False, limit_buffer=0.005):
+    """Autonomous live execute, with guardrails: market-open gate (skipped if
+    ext_hours, which trades the extended session), dedupe by plan hash, and a
+    60%-of-equity safety cap."""
     import hashlib
     if ag.simulated:
         st.info("🔴 Auto-pilot: simulated account — no live orders."); return
-    try:
-        if not ag.client.get_clock().is_open:
-            st.info("🔴 Auto-pilot armed — market closed, waiting for the open."); return
-    except Exception:
-        st.warning("🔴 Auto-pilot: couldn't verify market hours — skipping this cycle."); return
+    if not ext_hours:
+        try:
+            if not ag.client.get_clock().is_open:
+                st.info("🔴 Auto-pilot armed — market closed, waiting for the open."); return
+        except Exception:
+            st.warning("🔴 Auto-pilot: couldn't verify market hours — skipping this cycle."); return
     if len(orders) == 0:
         st.caption("🔴 Auto-pilot: aligned with the strategy, nothing to do."); return
     phash = hashlib.md5(orders.to_json().encode()).hexdigest()
@@ -204,7 +220,7 @@ def autopilot_execute(ag, orders, acc, trail):
         st.error(f"🔴 Auto-pilot ABORTED — order size ${gross:,.0f} > 60% of equity. "
                  "Something looks off; execute manually after reviewing."); return
     with st.spinner("🔴 Auto-pilot submitting live orders…"):
-        log = submit_reconcile_orders(ag, orders, acc, trail)
+        log = submit_reconcile_orders(ag, orders, acc, trail, ext_hours=ext_hours, limit_buffer=limit_buffer)
     st.session_state[f"exec_hash{acc}"] = phash
     st.success(f"🔴 Auto-pilot executed {len(orders)} live order(s) on account #{acc}.")
     st.code("\n".join(log))
@@ -220,6 +236,12 @@ max_lev = st.sidebar.slider("Leverage cap (acct 1)", 1.0, 1.8, 1.0, 0.1,
 vol_target = st.sidebar.slider("Vol target", 0.08, 0.20, 0.17, 0.01)
 crypto = st.sidebar.checkbox("Crypto sleeve (acct 1, 5%)", value=True)
 trail_pct = st.sidebar.slider("Trailing stop %", 0, 30, 20)
+ext_hours = st.sidebar.toggle("🌙 Extended hours (pre/post market)", value=False,
+                              help="Trade the pre/post-market session via whole-share DAY limit orders. "
+                                   "Thin liquidity, no daily-signal edge — use deliberately, not as default.")
+ext_buffer = st.sidebar.slider("Ext-hours limit buffer %", 0.1, 2.0, 0.5, 0.1) / 100.0 if ext_hours else 0.005
+if ext_hours:
+    st.sidebar.warning("🌙 Extended-hours ON — orders become whole-share limit; fractional sizing off.")
 ai_monitor = st.sidebar.toggle("🤖 AI monitor (auto-refresh)", value=False,
                                help="Continuously re-checks positions/regime/margin.")
 refresh_sec = st.sidebar.select_slider("Refresh interval", [15, 30, 60, 120, 300], value=60) if ai_monitor else None
@@ -332,7 +354,7 @@ with tab_live:
                     a = account_dict(agent)
                     held = {p["symbol"]: p["qty"] for p in agent.get_positions()}
                     st.session_state[f"plan{account}"] = reconcile(weights, last_price, held, a["equity"],
-                                                                    whole_shares=(account == 2))
+                                                                    whole_shares=(account == 2 or ext_hours))
                     try:
                         st.session_state[f"regime{account}"] = _detect_regime("auto")
                     except Exception:
@@ -368,9 +390,10 @@ with tab_live:
             orders = plan[plan["_side"].notna()]
             st.markdown(f"**Execute — {len(orders)} order(s)**")
             if autopilot:
-                autopilot_execute(agent, orders, account, trail_pct)
+                autopilot_execute(agent, orders, account, trail_pct, ext_hours=ext_hours, limit_buffer=ext_buffer)
             else:
-                manual_execute_ui(agent, orders, account, trail_pct, key=f"live{account}")
+                manual_execute_ui(agent, orders, account, trail_pct, key=f"live{account}",
+                                  ext_hours=ext_hours, limit_buffer=ext_buffer)
         agent_section()
 
 
@@ -451,7 +474,7 @@ with tab_deploy:
             w1, lp1, _ = compute_signals("portfolio_full", "sp500", vol_target, max_lev, cw, 0.10, str(datetime.now().date()))
             ag1 = get_agent(1); a1 = account_dict(ag1)
             plans[1] = reconcile(w1, lp1, {p["symbol"]: p["qty"] for p in ag1.get_positions()}, a1["equity"],
-                                 whole_shares=False)
+                                 whole_shares=ext_hours)
         # acct 2 — managed futures uses whole-share orders (shorts can't be fractional)
         with st.spinner("acct 2 — managed futures…"):
             w2, lp2, _ = compute_signals("managed_futures", "same", 0.12, 1.5, 0.0, 0.0, str(datetime.now().date()))
@@ -471,7 +494,8 @@ with tab_deploy:
             orders = plan[plan["_side"].notna()]
             with st.expander(f"Account #{acc} — {ACCOUNTS[acc]} · {len(orders)} order(s)", expanded=True):
                 st.dataframe(plan[DISPLAY_COLS], width='stretch', hide_index=True)
-                manual_execute_ui(get_agent(acc), orders, acc, trail_pct, key=f"deploy{acc}")
+                manual_execute_ui(get_agent(acc), orders, acc, trail_pct, key=f"deploy{acc}",
+                                  ext_hours=ext_hours, limit_buffer=ext_buffer)
 
         # acct 3 LEAPS
         pl = plans["leaps"]

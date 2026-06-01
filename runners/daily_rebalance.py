@@ -508,6 +508,11 @@ def main():
                     help="disable parameter ensembling (bet on single params instead)")
     ap.add_argument("--trail-pct", type=float, default=8.0,
                     help="trailing-stop percent on long positions after rebalance (0 = off)")
+    ap.add_argument("--extended-hours", action="store_true",
+                    help="trade pre/post market via DAY limit orders (equities, WHOLE-SHARE only). "
+                         "Off by default: extended hours has thin liquidity + no daily-signal edge.")
+    ap.add_argument("--limit-buffer", type=float, default=0.005,
+                    help="marketable-limit buffer for extended-hours orders (0.005 = 0.5%%)")
     args = ap.parse_args()
 
     if args.universe.strip().lower() == "quality":
@@ -550,7 +555,8 @@ def main():
     else:
         print(f"Target invested: {invested:.0%} | cash: {max(0, 1 - invested):.0%}\n")
 
-    sizing = "whole-share" if args.whole_shares else "fractional (notional $)"
+    sizing = ("whole-share LIMIT (extended hours)" if args.extended_hours
+              else "whole-share" if args.whole_shares else "fractional (notional $)")
     print(f"Sizing: {sizing} | no-trade band: ${args.min_order:,.0f}\n")
     hdr = (f"{'ticker':7s} {'signals':28s} {'tgt_w':>6s} {'price':>9s} "
            f"{'tgt_$':>9s} {'cur_$':>9s} {'delta_$':>9s} {'action':>6s}")
@@ -577,15 +583,20 @@ def main():
         delta_dollar = tgt_dollar - cur_dollar
         sigs = ",".join(detail.get(t, [])) if detail.get(t) else "(flat)"
 
+        whole = args.whole_shares or args.extended_hours or w < 0 or cur_sh < 0
         if abs(w) < 1e-9 and cur_sh != 0:         # target flat -> close long OR short
             action = "SELL" if cur_sh > 0 else "BUY"
-            orders.append({"ticker": t, "side": action.lower(), "qty": abs(cur_sh)})
+            q = abs(int(cur_sh)) if whole else abs(cur_sh)
+            if q > 0:
+                orders.append({"ticker": t, "side": action.lower(), "qty": q, "px": px})
+            else:
+                action = "skip"
         elif abs(delta_dollar) >= args.min_order:
             action = "BUY" if delta_dollar > 0 else "SELL"
-            if args.whole_shares or w < 0 or cur_sh < 0:   # shorts: whole-share only (no fractional)
+            if whole:                              # shorts/extended-hours: whole-share only
                 qty = abs(int(delta_dollar / px))
                 if qty > 0:
-                    orders.append({"ticker": t, "side": action.lower(), "qty": qty})
+                    orders.append({"ticker": t, "side": action.lower(), "qty": qty, "px": px})
                 else:
                     action = "skip"
             else:
@@ -614,12 +625,22 @@ def main():
         except Exception as e:
             print(f"  [warn] could not cancel open orders: {e}")
     for o in orders:
-        res = agent.run({"payload": {"signal": {**o, "order_type": "market",
-                                                "time_in_force": "day"}},
-                         "strategy_id": f"daily_{args.book}"})
+        sig = {k: v for k, v in o.items() if k != "px"}
+        sig["time_in_force"] = "day"
+        ext = args.extended_hours and o.get("px") and "qty" in o
+        if ext:                                    # pre/post market: marketable DAY limit
+            buf = args.limit_buffer
+            sig["order_type"] = "limit"
+            sig["extended_hours"] = True
+            sig["limit_price"] = round(o["px"] * (1 + buf) if o["side"] == "buy"
+                                       else o["px"] * (1 - buf), 2)
+        else:
+            sig["order_type"] = "market"
+        res = agent.run({"payload": {"signal": sig}, "strategy_id": f"daily_{args.book}"})
         status = res.get("fill", {}).get("status", res.get("reason"))
         amt = f"{o['qty']:>7g} sh" if "qty" in o else f"${o['notional']:>8,.0f}"
-        print(f"  {o['side'].upper():4s} {amt} {o['ticker']:6s} -> {status}")
+        tag = f" (ext-hrs limit @{sig['limit_price']})" if ext else ""
+        print(f"  {o['side'].upper():4s} {amt} {o['ticker']:6s} -> {status}{tag}")
 
     if args.trail_pct > 0 and args.book != "managed_futures":
         print(f"\nSyncing trailing stops ({args.trail_pct}%)...")

@@ -30,11 +30,12 @@ Write-Host "Registered: DailyRebalance_AM  (6:15 AM weekdays)"
 # --- Account 1: equity growth book (3:50 PM close run) ----------------------
 $action_pm = New-ScheduledTaskAction -Execute $ps `
     -Argument "-NonInteractive -File `"$proj\run_rebalance_close.ps1`""
-$trigger_pm = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $weekdays -At "03:50PM"
+# 12:50 PM PACIFIC = 3:50 PM ET = 10 min before the 1:00 PM PT / 4:00 PM ET close
+$trigger_pm = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $weekdays -At "12:50PM"
 Register-ScheduledTask -TaskName "DailyRebalance_Close" `
     -Action $action_pm -Trigger $trigger_pm -Settings $settings `
     -RunLevel Highest -Force
-Write-Host "Registered: DailyRebalance_Close  (3:50 PM weekdays)"
+Write-Host "Registered: DailyRebalance_Close  (12:50 PM PT weekdays)"
 
 # --- Account 2: managed-futures crisis-alpha (6:20 AM open run) -------------
 $action_mf = New-ScheduledTaskAction -Execute $ps `
