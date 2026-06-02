@@ -23,6 +23,9 @@ claude-agent-sdk>=0.1.0
 # interactive dashboard / control panel (app/dashboard.py)
 streamlit>=1.40.0        # run with: streamlit run app/dashboard.py
 
+# tests
+pytest>=8.0.0            # run with: python -m pytest tests/
+
 # utilities
 python-dotenv>=1.0.0     # for .env API key management
 tqdm>=4.66.0             # progress bars for data loading
