@@ -32,6 +32,7 @@ from agents.execution_agent import ExecutionAgent
 from agents.daily_strategies import QUALITY_UNIVERSE
 from runners.daily_rebalance import target_weights, _detect_regime
 from runners.options_book import leaps_plan
+from runners.stop_guard import enforce_stops
 
 ROOT = Path(__file__).parent.parent
 TRACK = ROOT / "results" / "track_record.csv"
@@ -242,6 +243,13 @@ ext_hours = st.sidebar.toggle("🌙 Extended hours (pre/post market)", value=Fal
 ext_buffer = st.sidebar.slider("Ext-hours limit buffer %", 0.1, 2.0, 0.5, 0.1) / 100.0 if ext_hours else 0.005
 if ext_hours:
     st.sidebar.warning("🌙 Extended-hours ON — orders become whole-share limit; fractional sizing off.")
+stop_guard_on = st.sidebar.toggle("🛡️ Stop guard (auto-liquidate breaches)", value=False,
+                                  help="Software stop on Account 1 longs: liquidates any position that breaks its "
+                                       "trailing/hard stop — including pre/post/overnight when broker stops can't fire. "
+                                       "Sells only; suspect/bad-data prices are skipped for manual review.")
+guard_hard = st.sidebar.slider("Stop-guard hard floor %", 8, 30, 15) if stop_guard_on else 15
+if stop_guard_on:
+    st.sidebar.error("🛡️ Stop guard ON — auto-SELLS breached Account-1 longs each refresh.")
 ai_monitor = st.sidebar.toggle("🤖 AI monitor (auto-refresh)", value=False,
                                help="Continuously re-checks positions/regime/margin.")
 refresh_sec = st.sidebar.select_slider("Refresh interval", [15, 30, 60, 120, 300], value=60) if ai_monitor else None
@@ -295,6 +303,31 @@ with tab_live:
                                subset=["Unreal P&L $", "Unreal P&L %"])
             st.dataframe(sty, width='stretch', hide_index=True)
     live_panel()
+
+    # ---- stop guard (Account 1 longs; covers pre/post/overnight) ----
+    def _show_guard_log(log):
+        for l in log:
+            if l.startswith("LIQUIDATE"):
+                st.error(l)
+            elif l.startswith(("SUSPECT", "BREACH")):
+                st.warning(l)
+            else:
+                st.caption(l)
+
+    if stop_guard_on and account == 1:
+        @st.fragment(run_every=(refresh_sec if (ai_monitor and refresh_sec) else 60))
+        def guard_panel():
+            st.markdown("**🛡️ Stop guard** — auto-liquidating breaches")
+            _show_guard_log(enforce_stops(agent, trail_pct=float(trail_pct), hard_pct=float(guard_hard),
+                                          ext_buffer=ext_buffer, do_liquidate=True))
+        guard_panel()
+    elif stop_guard_on:
+        st.caption("🛡️ Stop guard runs on Account 1 longs only (shorts/options excluded). Switch to account #1.")
+    else:
+        with st.expander("🛡️ Stop guard (off — peek without selling)", expanded=False):
+            if st.button("Check stops now (report only)", key=f"sgchk{account}"):
+                _show_guard_log(enforce_stops(agent, trail_pct=float(trail_pct), hard_pct=float(guard_hard),
+                                              ext_buffer=ext_buffer, do_liquidate=False))
 
     st.divider()
     st.markdown("#### 🤖 AI Agent — strategy decision")
