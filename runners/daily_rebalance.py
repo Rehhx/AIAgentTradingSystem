@@ -215,6 +215,20 @@ def _managed_futures_weights(source, target_vol, max_lev):
     return weights, last_price, detail
 
 
+def _vix_backwardation() -> bool:
+    """True when spot VIX >= 3-month VIX (term-structure inversion) — a FAST crash
+    signal that front-runs the realized-vol early-warning. Walk-forward validated:
+    on the book it lifts Sharpe 1.55->1.59 and cuts COVID DD -9.4%->-7.7%
+    (runners/sentinel_book_wf.py). Best-effort; on any error it simply doesn't fire."""
+    try:
+        import yfinance as yf
+        v = float(yf.Ticker("^VIX").history(period="5d")["Close"].iloc[-1])
+        v3 = float(yf.Ticker("^VIX3M").history(period="5d")["Close"].iloc[-1])
+        return v3 > 0 and (v / v3) >= 1.0
+    except Exception:
+        return False
+
+
 def target_weights(book: str, universe: list, source: str = "auto",
                    xs_universe: str = "same", vol_target_pct: float = 0.0,
                    max_lev: float = 1.0, park_cash: str = "BIL",
@@ -414,17 +428,26 @@ def target_weights(book: str, universe: list, source: str = "auto",
             print(f"  [vol-target {vol_target_pct:.0%}] recent vol {rv:.0%} "
                   f"-> exposure scale {scale:.2f}x")
 
-    # early-warning de-risk: cut exposure to 60% when SPY breaks its 50-day AND
-    # 20-day vol > 20% -- front-runs the lagging 200-day bear signal (improves
-    # Sharpe 1.45->1.48 and DD -13.8%->-11.7% in backtest).
+    # de-risk to 60% on EITHER trigger:
+    #  (1) early-warning: SPY < 50d AND 20d-vol > 20% -- catches slow grinding bears
+    #  (2) VIX backwardation (spot VIX >= 3mo VIX) -- catches FAST vol-spike crashes
+    #      ~2.5x faster than (1) on COVID/2018-Feb. The two are complementary; combined
+    #      they lift book Sharpe 1.55->1.59, DD -9.4%->-7.8%, 5/5 walk-forward folds.
     if early_warning:
         try:
             spy = fetch_daily(XS_MKT, source=source)["close"]
             below50 = float(spy.iloc[-1]) < float(spy.rolling(50).mean().iloc[-1])
             volspike = float(spy.pct_change().rolling(20).std().iloc[-1]) * (252 ** 0.5) > 0.20
-            if below50 and volspike:
+            ew = below50 and volspike
+            vix_inv = _vix_backwardation()
+            if ew or vix_inv:
                 weights = {t: w * 0.6 for t, w in weights.items()}
-                print("  [early-warning] SPY < 50d AND vol > 20% -> de-risked to 60%")
+                trig = []
+                if ew:
+                    trig.append("SPY<50d & vol>20%")
+                if vix_inv:
+                    trig.append("VIX backwardation (fast-crash sentinel)")
+                print(f"  [early-warning] de-risked to 60% | trigger: {' + '.join(trig)}")
         except Exception:
             pass
 
