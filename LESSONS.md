@@ -142,6 +142,7 @@ These are NOT confirmed dead. They're untested or barely tested.
 | Run `bb_band_touch_revert` at default params | 49% WR, Sharpe ~-12 |
 | Run `qqq_spy_dispersion` with ATR stop | Same -22 Sharpe; signal logic is the problem |
 | `half_hour_continuation` at default 3bps | Sharpe ~-7 from cost drag |
+| Price OTM options off VIX (covered-call/income backtest) | ~3× too-rich premium; equity skew makes OTM-call IV ~⅔ of VIX — use the real chain (see 8h) |
 
 ---
 
@@ -291,3 +292,43 @@ verdicts are retained in `results/strategy_ledger.json` (61 entries) so agents
 know what's been tried; the ledger is injected into agent prompts via
 `_existing_strategies_summary()`. The 3 daily winners live in
 `agents/daily_strategies.py`.
+
+### 8h. Crash sentinel deployed + options skew kills the covered call (2026-06-03)
+
+Research round across the three books (equity / managed-futures / options):
+
+- **VIX-term-structure crash sentinel — DEPLOYED.** Spot VIX ≥ 3-month VIX
+  (backwardation) is a FAST crash signal that front-runs the realized-vol
+  early-warning (~2.5× faster on COVID / 2018-Feb). Wired as a 2nd de-risk
+  trigger in `daily_rebalance` (cut to 60% if early-warning OR sentinel fires).
+  On the full 7-sleeve book: **Sharpe 1.55→1.59, maxDD −9.4%→−7.8%, COVID DD
+  −9.4%→−7.7%, 5/5 walk-forward folds.** Standalone on SPY it's only ~0.69 Sharpe
+  (SPY itself is 0.62) and FAILS slow grinds (2022 −29.6%) — a fast-crash
+  specialist, complementary to early-warning. Tools: `crash_sentinel.py`,
+  `sentinel_book_wf.py`.
+
+- **Cross-sectional momentum for managed futures (Acct 2) — modest, NOT wired.**
+  XS momentum (rank the 10 asset ETFs, long top-3 / short bottom-3) shows NO
+  Sharpe gain vs the deployed time-series momentum (0.12 both), corr +0.40, but
+  trims DD ~3pt and balances crisis coverage (TS strong 2008 +11.4%, XS strong
+  2022 +11.2%, blend +ve in both). A robustness add only. `futures_xsmom.py`.
+
+- **Covered-call income (Acct 3) — REJECTED, pricing artifact.** Buy-write
+  backtest looked like a 1.29 Sharpe winner vs 0.76 buy-hold — contradicting 35yr
+  BXM history. Real-chain snapshot found why: a 3% OTM SPY call (~23 DTE) **bids
+  $1.49 vs the BS-mid $4.44 the backtest assumed — you collect only 34% of the
+  modeled premium.** At real premiums the edge evaporates. `options_coveredcall.py`
+  (kept as the cautionary tale).
+
+- **THE LESSON — never price non-ATM options at VIX.** VIX is ~ATM implied vol;
+  the equity vol SKEW makes OTM calls cheap (IV ~10% here, not 15.8%) and OTM puts
+  dear. Pricing any non-ATM strike off VIX is wildly wrong (3× for this OTM call).
+  Deep-ITM LEAPS (`options_leverage.py`) are ~80% intrinsic so the IV error barely
+  moves them — but even that deserves a real-chain check. Snapshot tooling:
+  `execution_agent.find_leaps_contract` + `option_quote`.
+
+- **Stop-guard sanity floor (2026-06-02).** An auto-liquidator must NEVER act on
+  implausible prices. A paper-feed glitch showed BNY −92% (entry $139.77, stale
+  mark $10.44, real ~$142); the guard's sanity floor (drop > 40% vs entry =
+  suspect data) flagged it for review instead of dumping a healthy position.
+  `stop_guard.py`. (The glitch self-resolved next session — transient feed lag.)
