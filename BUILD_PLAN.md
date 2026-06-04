@@ -79,7 +79,13 @@ were rejected, including a volatility-skew pricing artifact that overstated retu
 
 ---
 
-## TIER 2A — Event-driven backtester (look-ahead-free by construction)
+## TIER 2A — Event-driven backtester (look-ahead-free by construction)   [STATUS: DONE — 2026-06-04]
+
+**Delivered:** `backtest/` package (events, data, strategy, portfolio, execution, engine).
+The DataHandler hard-bounds reads to `iloc[:cursor+1]` so look-ahead is impossible by
+construction. `runners/bt_parity.py` validates against the vectorized book: trend_5020 on
+SPY -> **Sharpe 0.751 = 0.751, correlation 1.000000, total return within 8 bps**. 8 new
+engine tests (incl. the no-look-ahead firewall assertion); **52 tests passing total.**
 
 **Goal:** a reusable engine that *cannot* peek ahead — the infrastructure signal.
 
