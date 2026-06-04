@@ -222,6 +222,23 @@ adds nothing. MDA permutation importances confirm why: the few features that mat
 (`ret_126`, `bb_z`, `sma50_200`) are the same trend/momentum signals the rule-based book
 already uses equal-weighted — the model finds no extra, durable edge.
 
+**Two principled follow-ups, same answer.** (1) **Meta-labeling** (`ml_meta_label.py`) —
+let the trend rule pick direction and use ML only to *filter* which longs to take. OOS
+AUC 0.498; filtering *lowered* Sharpe 0.78 → 0.34. ML can't even tell the rule's good
+trades from its bad ones. (2) **Volatility** (`ml_volatility.py`) — point the identical
+pipeline at a target that *is* predictable. Forward 10-day vol is forecastable (OOS R²
+0.24 via persistence vs AUC ~0.50 for direction — the pipeline is sound), but the
+gradient-boosted model (R² 0.15) **loses to the one-line persistence baseline.**
+
+**The unifying result:** across four independent tests — ensembling beats single-sleeve
+selection (PBO 52%), buy-hold beats directional ML, the raw rule beats meta-filtering,
+and persistence-vol beats GBM-vol — **the parsimonious baseline wins every time, and the
+rigorous tooling detects it every time.** The block's existing `vol_target` already uses
+trailing realized vol; this confirms that simple choice is near-optimal. The path to a
+model that adds value is **new orthogonal data** (options-implied surfaces, cross-section,
+macro/flow), *not* a fancier model on the same price series. Stopping here rather than
+tuning to a green number is the discipline; the negative result is the finding.
+
 **Lesson:** time-aware validation plus a benchmark comparison turns "ML found a 0.6
 Sharpe strategy!" into the correct conclusion — *the simple ensemble is better, and ML
 adds no alpha here.* Reporting that plainly is the credible quant-research outcome.
