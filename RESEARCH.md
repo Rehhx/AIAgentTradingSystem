@@ -198,7 +198,35 @@ overfitting — exactly what §3 is built to prevent.
 
 ---
 
-## 7. Rejected strategies (and why)
+## 7. Machine learning, done correctly (and the honest negative)
+
+A gradient-boosted classifier was trained to predict **triple-barrier labels** on SPY
+from 14 trailing features (momentum, trend distance, mean-reversion oscillators, realized
+vol). The discipline is the point: validation uses **PurgedKFold** — contiguous folds,
+training rows whose label window overlaps the test span are **purged**, and an **embargo**
+drops the serial-correlation tail (López de Prado). No shuffling, no leakage.
+
+| Metric | Value |
+|---|---|
+| OOS AUC | ~0.49–0.51 (0.50 = no skill) |
+| OOS accuracy | 53.4% vs a **61.3% always-up base rate** |
+| ML-signal Sharpe | 0.61 |
+| Buy-and-hold SPY Sharpe | 0.91 |
+| Simple `trend_5020` Sharpe | 0.78 |
+
+The model is **worse than the trivial majority-class baseline** and underperforms both
+buy-and-hold and the one-line trend rule. A subtle trap appears here: the
+deflated-Sharpe-**vs-zero** "passes" at 95.6% — but beating *zero* is trivial for a
+long-biased equity strategy. The honest bar is the *benchmark*, and against it the model
+adds nothing. MDA permutation importances confirm why: the few features that matter
+(`ret_126`, `bb_z`, `sma50_200`) are the same trend/momentum signals the rule-based book
+already uses equal-weighted — the model finds no extra, durable edge.
+
+**Lesson:** time-aware validation plus a benchmark comparison turns "ML found a 0.6
+Sharpe strategy!" into the correct conclusion — *the simple ensemble is better, and ML
+adds no alpha here.* Reporting that plainly is the credible quant-research outcome.
+
+## 8. Rejected strategies (and why)
 
 | Strategy | Result | Why rejected |
 |---|---|---|
@@ -215,7 +243,7 @@ second test, not the first.
 
 ---
 
-## 8. Limitations & next steps
+## 9. Limitations & next steps
 
 - **Reality Check on raw returns** penalizes partially-in-cash strategies; a
   Sharpe-/risk-adjusted differential test is the fairer comparison and is the next
@@ -233,9 +261,11 @@ second test, not the first.
 
 ```bash
 python runners/rigor_report.py        # §3 — DSR, PBO, Reality Check / SPA
+python runners/ml_signal.py           # §7 — purged-CV ML, the honest negative
+python runners/bt_parity.py           # event-engine vs vectorized parity
 python runners/sentinel_book_wf.py    # §6 — book + crash sentinel, walk-forward
 python runners/leverage_compare.py    # §6 — Sharpe is flat across leverage
-pytest tests/                         # 44 tests incl. the statistical-rigor battery
+pytest tests/                         # 63 tests incl. the statistical-rigor battery
 ```
 
 Statistical-rigor library: `analytics/significance.py` (Deflated/Probabilistic Sharpe,

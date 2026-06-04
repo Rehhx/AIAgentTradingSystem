@@ -107,7 +107,20 @@ handling that prevents look-ahead bias by construction; validated against vector
 
 ---
 
-## TIER 3 — ML with time-aware validation
+## TIER 3 — ML with time-aware validation   [STATUS: DONE — 2026-06-04]
+
+**Delivered:** `ml/` package — `cv.PurgedKFold` (purge + embargo, no shuffling),
+`labels.triple_barrier_labels`, `features.make_features` (trailing-only). Runner
+`runners/ml_signal.py` trains a gradient-boosted classifier on SPY, validates with
+PurgedKFold, and grades the OOS strategy with the Tier-1A deflated Sharpe. 11 new tests
+(no-overlap / embargo-buffer / label correctness); **63 tests passing total.**
+
+**RESULT (honest negative):** OOS AUC ~0.49-0.51 (no skill); OOS accuracy 53% < the 61%
+always-up base rate; ML strategy Sharpe 0.61 < buy-hold 0.91 < trend rule 0.78. The
+deflated-Sharpe-vs-ZERO "passes" (95.6%) but that's a TRAP — beating zero is trivial for
+a long-biased equity strategy; against the benchmark it adds no value. MDA shows the top
+features are the same trend/momentum signals the rule-based book already uses. ML finds
+no extra durable edge -> the equal-weight ensemble stands.
 
 **Goal:** ML done *correctly* — the methodology is the value, even though it likely won't
 beat the simple book (state that honestly).
