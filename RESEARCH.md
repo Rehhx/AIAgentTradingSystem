@@ -234,10 +234,17 @@ gradient-boosted model (R² 0.15) **loses to the one-line persistence baseline.*
 selection (PBO 52%), buy-hold beats directional ML, the raw rule beats meta-filtering,
 and persistence-vol beats GBM-vol — **the parsimonious baseline wins every time, and the
 rigorous tooling detects it every time.** The block's existing `vol_target` already uses
-trailing realized vol; this confirms that simple choice is near-optimal. The path to a
-model that adds value is **new orthogonal data** (options-implied surfaces, cross-section,
-macro/flow), *not* a fancier model on the same price series. Stopping here rather than
-tuning to a green number is the discipline; the negative result is the finding.
+trailing realized vol; this confirms that simple choice is near-optimal.
+
+We then tested the one principled "keep working" lever — **new orthogonal information**,
+not a fancier model. `ml_orthogonal.py` fed FREE cross-asset features (VIX term structure
+^VIX/^VIX3M, credit HYG/LQD, TLT, the dollar) into the same pipeline. Still no directional
+edge: OOS AUC 0.498, strategy Sharpe 0.70 < buy-hold 0.89. So daily directional prediction
+has **no edge even in orthogonal free data** — the only remaining lever is *paid* data
+(options-implied surfaces). Notably, VIX term structure still earns its keep as a *risk*
+overlay (it powers the crash sentinel, §6) — just not as a directional alpha feature.
+Stopping here rather than tuning to a green number is the discipline; the negative result
+is the finding.
 
 **Lesson:** time-aware validation plus a benchmark comparison turns "ML found a 0.6
 Sharpe strategy!" into the correct conclusion — *the simple ensemble is better, and ML
