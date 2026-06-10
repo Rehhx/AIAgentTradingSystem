@@ -233,7 +233,8 @@ def target_weights(book: str, universe: list, source: str = "auto",
                    xs_universe: str = "same", vol_target_pct: float = 0.0,
                    max_lev: float = 1.0, park_cash: str = "BIL",
                    early_warning: bool = True, name_cap: float = 0.0,
-                   crypto_weight: float = 0.0, ensemble: bool = True) -> tuple[dict, dict, dict]:
+                   crypto_weight: float = 0.0, ensemble: bool = True,
+                   park_riskon: str | None = None) -> tuple[dict, dict, dict]:
     """returns (weights, last_price, detail). Per-ticker sleeves give each long
     name alloc/N. The 'xs_dualmom' sleeve ranks a (possibly larger) universe by
     12-1 momentum and gives the top-K names alloc/K (cash when SPY < its 200d
@@ -433,6 +434,7 @@ def target_weights(book: str, universe: list, source: str = "auto",
     #  (2) VIX backwardation (spot VIX >= 3mo VIX) -- catches FAST vol-spike crashes
     #      ~2.5x faster than (1) on COVID/2018-Feb. The two are complementary; combined
     #      they lift book Sharpe 1.55->1.59, DD -9.4%->-7.8%, 5/5 walk-forward folds.
+    derisked = False
     if early_warning:
         try:
             spy = fetch_daily(XS_MKT, source=source)["close"]
@@ -442,6 +444,7 @@ def target_weights(book: str, universe: list, source: str = "auto",
             vix_inv = _vix_backwardation()
             if ew or vix_inv:
                 weights = {t: w * 0.6 for t, w in weights.items()}
+                derisked = True
                 trig = []
                 if ew:
                     trig.append("SPY<50d & vol>20%")
@@ -463,20 +466,27 @@ def target_weights(book: str, universe: list, source: str = "auto",
         if capped:
             print(f"  [name-cap] capped {len(capped)} name(s) at {name_cap:.0%}: {', '.join(sorted(capped))}")
 
-    # park idle cash in a T-bill ETF so uninvested capital earns ~yield, not 0%.
-    # Self-reinforcing for lean years: defensive periods hold more cash -> more yield.
-    if park_cash:
+    # park idle (uninvested) capital. DEFAULT: T-bills (BIL) for yield. With
+    # park_riskon set (e.g. SPY), idle capital DEFAULTS TO THE MARKET while RISK-ON
+    # so the book stops trailing SPY by sitting in cash -- but falls back to park_cash
+    # (BIL) the moment the de-risk overlay fires (the sentinel brake). Index backtest:
+    # SPY-like return (13.6% vs 13.9% CAGR) at a higher Sharpe (0.97 vs 0.82) and ~1/3
+    # smaller drawdown (-22.8% vs -33.7%). See runners/market_park_backtest.py.
+    park_target = park_riskon if (park_riskon and not derisked) else park_cash
+    if park_target:
         invested = sum(w for w in weights.values() if w > 0)
         idle = round(1.0 - invested, 4)
         if idle > 0.01:
             try:
-                weights[park_cash] = weights.get(park_cash, 0.0) + idle
-                detail.setdefault(park_cash, []).append("cash_yield")
-                if park_cash not in last_price:
-                    last_price[park_cash] = float(fetch_daily(park_cash, source=source)["close"].iloc[-1])
-                print(f"  [cash-yield] parking {idle:.0%} idle cash in {park_cash} (T-bill yield)")
+                weights[park_target] = weights.get(park_target, 0.0) + idle
+                in_market = park_target == park_riskon and not derisked
+                detail.setdefault(park_target, []).append("market_park" if in_market else "cash_yield")
+                if park_target not in last_price:
+                    last_price[park_target] = float(fetch_daily(park_target, source=source)["close"].iloc[-1])
+                label = "RISK-ON market park" if in_market else "T-bill yield"
+                print(f"  [cash-park] parking {idle:.0%} idle cash in {park_target} ({label})")
             except Exception as e:
-                print(f"  [warn] could not park cash in {park_cash}: {e}")
+                print(f"  [warn] could not park cash in {park_target}: {e}")
     return weights, last_price, detail
 
 
@@ -517,6 +527,10 @@ def main():
                     help="no-trade band: skip reconciling orders smaller than $X")
     ap.add_argument("--park-cash", default="BIL",
                     help="park idle cash in this T-bill ETF for yield ('' to disable)")
+    ap.add_argument("--park-market", default="",
+                    help="park idle cash in this ETF (e.g. SPY) while RISK-ON so the book "
+                         "tracks the market instead of sitting in cash; falls back to "
+                         "--park-cash when the de-risk overlay fires ('' = off)")
     ap.add_argument("--no-early-warning", action="store_true",
                     help="disable the SPY-50d/vol early-warning de-risk overlay")
     ap.add_argument("--name-cap", type=float, default=0.10,
@@ -566,7 +580,8 @@ def main():
         park_cash=(args.park_cash.strip().upper() or None),
         early_warning=(not args.no_early_warning), name_cap=args.name_cap,
         crypto_weight=(args.crypto_weight if args.crypto_sleeve else 0.0),
-        ensemble=(not args.no_ensemble))
+        ensemble=(not args.no_ensemble),
+        park_riskon=(args.park_market.strip().upper() or None))
     equity, esrc = get_equity(agent, args.notional)
     held = current_positions(agent)
 

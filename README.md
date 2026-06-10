@@ -1,80 +1,115 @@
 # quant-agent
 
-An autonomous multi-agent system that researches, validates, and paper-trades
-**daily / multi-day** quantitative trading strategies. Built on the Claude Agent
-SDK + Alpaca paper trading + free split/dividend-adjusted daily data (yfinance).
+A research-grade, multi-engine systematic trading system: it **researches,
+statistically validates, and paper-trades** daily/multi-day strategies across three
+independent books — and, just as importantly, it is built to *prove what is real and
+admit what isn't*. Built on free split/dividend-adjusted daily data (yfinance), Alpaca
+paper trading, and a from-scratch statistical-rigor + backtesting toolkit.
 
-![quant-agent dashboard — Sharpe 1.44, 14.5% CAGR, -12.7% max drawdown, 5/5 walk-forward folds, 12-agent pipeline](docs/dashboard-preview.svg)
-
-### 📊 Live dashboard
-
-An interactive dashboard (agent pipeline board, equity curve vs SPY, walk-forward,
-book metrics) lives in [`docs/`](docs/index.html) and is built for **GitHub Pages**:
-
-1. push the repo, then in **Settings → Pages** set *Source: Deploy from a branch*,
-   branch `main`, folder **`/docs`**;
-2. it goes live at `https://<you>.github.io/<repo>/`.
-
-Regenerate its data after a change with `python runners/build_dashboard_data.py`
-(writes `docs/data.json`), then commit `docs/`.
-
-> **The core finding of this project:** 1-minute intraday strategies do **not**
-> survive realistic costs (6 bps round-trip) — across 30+ strategies, loss
-> magnitude tracked trade count almost perfectly. The edge appears once you move
-> to **daily / multi-day holds**, where the same cost is amortized over a
-> multi-week move. Everything below is built on that shift. See
-> [LESSONS.md](LESSONS.md) for the full institutional record.
+> **What makes this project credible isn't a big backtested Sharpe — it's the
+> machinery that stops us fooling ourselves.** We deflate Sharpes for the number of
+> strategies tried, measure the probability of backtest overfitting, run data-snooping
+> tests, validate ML with purged/embargoed cross-validation, and backtest on a
+> look-ahead-free event engine. The honest conclusion of all that rigor is below, and
+> it is not "we beat the market with secret alpha."
 
 ---
 
-## The deployable strategy
+## The two core findings
 
-A diversified **ensemble of seven mechanisms**, each independently screened against
-the risk gate and walk-forward, combined by weight and volatility-targeted:
+1. **Intraday → daily.** 1-minute strategies do **not** survive realistic costs (6 bps
+   round-trip): across 30+ strategies, loss magnitude tracked trade count almost
+   perfectly. The edge appears only on **daily/multi-day holds**, where the same cost is
+   amortized over a multi-week move. ([LESSONS.md](LESSONS.md))
 
-| Component | Universe | Role |
+2. **No reliable alpha over SPY — so compete on *risk*, not raw return.** Our own rigor
+   battery (below) shows single-strategy selection is ~indistinguishable from noise
+   (PBO ≈ 52%) and no sleeve beats buy-and-hold SPY after data-snooping correction
+   (Reality-Check / SPA *p* ≈ 0.83). The defensible edge is **drawdown reduction**: a
+   crash-sentinel overlay delivers SPY-like return at a **higher Sharpe and a third less
+   drawdown**. We say this plainly rather than curve-fit a prettier number.
+   ([RESEARCH.md](RESEARCH.md))
+
+---
+
+## Architecture — three independent books
+
+| Book | Mandate | Posture |
 |---|---|---|
-| RSI-2 mean reversion (tuned) | 10 quality names | buy short-term dips in an uptrend |
-| Donchian breakout (20/10) | 10 quality names | ride breakouts |
-| 50/200 trend | 10 quality names | long-term trend |
-| Cross-sectional dual-momentum | **full S&P 500** | hold top-10 relative-strength names; cash in bear markets |
-| Recovery-thrust | 10 quality names | catch bull-run snapbacks off the 200-day (lean-year capture) |
-| PEAD (post-earnings drift) | **full S&P 500** | hold gap-up earnings beats through the drift |
-| Defensive low-volatility | **full S&P 500** | hold 30 lowest-vol names while SPY>200d, else rotate to T-bills (bear/vol ballast) |
+| **Account 1 — Equity** | 7-sleeve long/flat ensemble (momentum, mean-reversion, PEAD, low-vol, recovery) + optional crypto | no margin (≤1.0×); vol-targeted; crash-sentinel de-risk |
+| **Account 2 — Managed futures** | time-series & cross-sectional momentum, long/short | crisis-alpha diversifier, ~uncorrelated |
+| **Account 3 — Options (WIP)** | deep-ITM LEAPS as defined-risk share-replacement | held; lifecycle manager (roll/stop) still to build — needs paid options data |
 
-Three overlays on top: **vol-targeting** (17%, ≤1.8× conditional leverage),
-**idle cash → BIL T-bills**, and an **early-warning de-risk** (cut to 60% when
-SPY < 50-day and vol spikes, ahead of the lagging 200-day bear signal).
+**No-margin posture (board decision):** vol-targeting can only *de-risk* (scale ≤ 1.0×),
+never borrow — the book **cannot be margin-called**. Leverage was tested and rejected:
+`leverage_compare.py` shows it raises CAGR *and* drawdown together with **flat Sharpe**.
 
-| Deploy book | Sharpe | $ PnL / $100k | CAGR | Max DD | Risk gate | Walk-forward |
-|---|---|---|---|---|---|---|
-| **`portfolio_full`** (7 sleeves, vol-target 17%, 1.8× cap) ⭐ | **1.53** | **+$475,850** | **18.4%** | **−13.4%** | ✅ PASS | ✅ 5/5 folds |
-| `blended_plus` (equal-weight, no leverage) | 1.44 | +$308,115 | 14.5% | −12.7% | ✅ PASS | ✅ 5/5 folds |
+---
 
-Backtest: 2016–2026, adjusted daily data, 6 bps round-trip, well above the desk's
-100-trades/year floor. **Positive in all 5 contiguous walk-forward folds**
-(in-sample Sharpe 1.08 → out-of-sample 2.33; lean 2018–2020 ≈ +9%). `portfolio_full`
-is the deployed 15–20% target book (conditional leverage); `blended_plus` is the
-no-leverage floor. New strategies are auto-screened by
-[`runners/portfolio_allocator.py`](runners/portfolio_allocator.py) — only those
-passing Sharpe + walk-forward join. **Complete strategy reference (every sleeve,
-overlay & parameter) in [STRATEGIES.md](STRATEGIES.md)**; full numbers in
-[BOARD_SUMMARY.md](BOARD_SUMMARY.md).
+## Research & rigor infrastructure ⭐
 
-**Researched and rejected (no-leverage options income):** a cash-secured
-**put-write** sleeve to harvest the volatility risk premium. Done properly
-(delta-targeted strikes, market-filtered, honest windowing — `options_income_v2.py`)
-it caps at **Sharpe < 1.0 with a −24% to −27% drawdown** at every strike: it would
-break the −15% gate and is 0.76-correlated to SPY. The VRP is real but it's payment
-for selling crash insurance — it *adds* equity-crash exposure rather than diversifying.
-Not deployed. (See [STRATEGIES.md](STRATEGIES.md) for the full analysis.)
+This is the part a quant desk should care about. Three from-scratch packages (no scipy
+in `analytics`), all unit-tested (**63 tests passing**):
 
-> **Honest caveats:** long-only equity book validated over a 2016–2026 bull
-> market — it is not market-neutral. Vol-targeting controls drawdown and the
-> walk-forward through the 2022 bear is real evidence of resilience, but it should
-> be paper-traded live for several weeks before any real capital. The 1.8× cap is
-> *conditional* leverage (only in calm markets; de-risks when vol spikes). The
-> cross-sectional sleeve can concentrate in the dominant momentum theme (semis/AI).
+### `analytics/` — does the edge survive scrutiny?
+- **Deflated Sharpe Ratio** (Bailey & López de Prado) — corrects Sharpe for non-normal
+  returns *and* the number of strategies tried.
+- **Probability of Backtest Overfitting** via combinatorially-symmetric CV.
+- **White's Reality Check** + **Hansen's SPA** — data-snooping p-values via stationary
+  block bootstrap.
+
+Run on all 13 sleeves (`runners/rigor_report.py`): best sleeve **DSR 99.4%** (real vs
+zero) but **PBO 52%** (selection is noise) and **RC/SPA p ≈ 0.83** (no alpha vs SPY).
+*This finding is what justifies the equal-weight ensemble + sentinel design.*
+
+### `backtest/` — a look-ahead-free event engine
+Classic `MarketEvent → SignalEvent → OrderEvent → FillEvent` loop. The data handler
+hard-bounds reads to `iloc[:cursor+1]`, so look-ahead bias is **impossible by
+construction**. Validated against the vectorized backtester (`runners/bt_parity.py`):
+trend rule on SPY matches at **Sharpe 0.751 = 0.751, correlation 1.000000**.
+
+### `ml/` — machine learning done correctly (and the honest negative)
+PurgedKFold (purge overlapping labels + embargo), triple-barrier labels, trailing-only
+features. Result across four principled experiments
+(`ml_signal`, `ml_meta_label`, `ml_volatility`, `ml_orthogonal`):
+**direction is unpredictable** (OOS AUC ≈ 0.50), **meta-labeling doesn't help**, and even
+**volatility ML loses to a one-line persistence baseline**. The parsimonious baseline wins
+every time. The only untested lever is *paid* data (options IV surface). We stopped rather
+than tune to a green number.
+
+---
+
+## The deployable book + today's fix
+
+The live Account-1 book (`run_rebalance.ps1`):
+```
+--book portfolio_full --xs-universe sp500 --vol-target 0.17 --max-leverage 1.0 --crypto-sleeve --trail-pct 20
+```
+
+**Why we were trailing SPY (diagnosed 2026-06):** the selective sleeves only ask for
+~62% of capital; the rest sat in **T-bills (BIL)**, leaving the book at **beta 0.52** —
+so it structurally lagged SPY in a bull run. That's a design choice ("sit in cash when no
+sleeve fires"), not a bug.
+
+**The fix — regime-aware parking (`--park-market SPY`):** default idle capital to the
+**market** while RISK-ON, falling back to BIL only when the crash sentinel de-risks. At
+the index level (`runners/market_park_backtest.py`, 2016–2026):
+
+| | CAGR | Sharpe | maxDD |
+|---|---|---|---|
+| Buy & hold SPY | 13.9% | 0.82 | −33.7% |
+| **Market + sentinel de-risk** | **13.6%** | **0.97** | **−22.8%** |
+
+SPY-like return, **+0.15 Sharpe, ~11 points less drawdown** (COVID −22% vs −33%). This is
+the honest "beat SPY" — through-cycle and risk-adjusted, not a bull-market sprint.
+
+**The crash sentinel** (deployed): de-risk to 60% when *either* the early-warning
+(SPY < 50-day & 20-day vol > 20%) *or* **VIX backwardation** (spot VIX ≥ 3-month VIX)
+fires — the latter front-runs fast crashes ~2.5× faster.
+
+> **Honest caveats:** long-biased, validated over a 2016–2026 bull-heavy sample; not
+> market-neutral. The market-park raises exposure (and downside) toward SPY by design —
+> it's a risk choice, not free alpha. Paper-trade before real capital.
 
 ---
 
@@ -84,132 +119,66 @@ Not deployed. (See [STRATEGIES.md](STRATEGIES.md) for the full analysis.)
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-cp env.example .env          # fill in ANTHROPIC / ALPACA keys (others optional)
+cp env.example .env          # ALPACA_* keys (1/2/3), optional ANTHROPIC/data keys
 ```
 
-### See the deployable book's numbers + walk-forward + risk
+### Inspect the rigor + performance
 ```powershell
-python runners\deploy_check.py
+python runners\rigor_report.py          # Deflated Sharpe, PBO, Reality-Check/SPA
+python runners\bt_parity.py             # event-engine vs vectorized parity
+python runners\market_park_backtest.py  # market-park + sentinel vs buy-hold SPY
+python runners\account_vs_spy.py --account 1   # live account vs SPY (since inception)
+pytest tests/                           # 63 tests
 ```
 
-### Paper-trade it (dry-run first, then --live)
+### Paper-trade (dry-run first, then --live)
 ```powershell
-# DEPLOYED book: 6-sleeve portfolio_full, vol-targeted (17% vol, up to 1.8x in calm)
-python runners\daily_rebalance.py --book portfolio_full --xs-universe sp500 --vol-target 0.17 --max-leverage 1.8           # dry-run (prints orders)
-python runners\daily_rebalance.py --book portfolio_full --xs-universe sp500 --vol-target 0.17 --max-leverage 1.8 --live    # submit to Alpaca paper
-
-# conservative, NO leverage (the floor):
-python runners\daily_rebalance.py --book blended_plus --xs-universe sp500 --vol-target 0.12 --live
+# deployed Account-1 book, now tracking the market when risk-on:
+python runners\daily_rebalance.py --book portfolio_full --xs-universe sp500 `
+    --vol-target 0.17 --max-leverage 1.0 --crypto-sleeve --park-market SPY            # dry-run
+python runners\daily_rebalance.py --book portfolio_full --xs-universe sp500 `
+    --vol-target 0.17 --max-leverage 1.0 --crypto-sleeve --park-market SPY --live     # submit
 ```
-Run it **once per trading day, before the 6:30 AM PST open** (it decides off the
-prior close and fills at the open). Orders are fractional (dollar-sized) with a
-$250 no-trade band. `run_rebalance.ps1` wraps this for Windows Task Scheduler.
-
-### Book menu (pick by risk appetite)
-| Book | Sharpe | CAGR | Max DD | Notes |
-|---|---|---|---|---|
-| **`portfolio_full`** (7 sleeves + vol-target 17%/1.8×) ⭐ | 1.53 | 18.4% | −13.4% | deployed 15–20% target book |
-| `blended_plus` + full-500 xs + vol-target | 1.44 | 14.5% | −12.7% | no leverage |
-| `regime_adaptive --max-leverage 1.5` | 1.41 | 20.8% | −18.4% | aggressive growth (paper) |
-| `defensive` (+ turn-of-month) | 1.22 | 8.3% | −8.3% | lowest risk |
-| put-write (options income) | <1.0 | ~5–10% | −25% | rejected: breaks the DD gate (see STRATEGIES.md) |
-
-> **Lean years:** this is a long-biased book — it has softer years in choppy/sideways
-> markets (2018–2020 ≈ +9% total after the recovery sleeve + cash yield). 15–20% is a
-> multi-year *average*, not a yearly guarantee — and the honest worst case is ~−32% (2008
-> GFC), not −13%. See [BOARD_SUMMARY.md](BOARD_SUMMARY.md) §5–6 (honest caveats & drawdown).
+Run once per trading day before the 6:30 AM PST open (decides off prior close, fills at
+open). `run_rebalance.ps1` wraps it for Windows Task Scheduler.
 
 ---
 
-## Monitoring & live track record
-
-Run once a day after the rebalance (the scheduler does this automatically):
-
+## Monitoring & diagnostics
 ```powershell
-python runners\monitor.py            # regime-posture check + append today's P&L
-python runners\monitor.py --history  # also print the full track-record table
+python runners\daily_vs_spy.py                  # today's P&L per account vs SPY
+python runners\account_vs_spy.py --account 1    # overall vs SPY + current allocation
+python runners\positions_detail.py --account 3  # options: mark vs intrinsic (stale-quote check)
+python runners\monitor.py                       # regime-posture check + track record
 ```
-
-It does three things: (1) a **regime-posture check** — detects the current market
-regime (bull-calm / bull-volatile / bear) and verifies the live book is positioned
-the way it *should* be for that regime, flagging any mismatch; (2) a **track record**
-— appends daily equity + P&L to `results/track_record.csv` and reports realized
-return / Sharpe / drawdown vs SPY over the tracked window (the live proof the book
-behaves like the backtest); (3) **alarms** — drawdown breach (< −15% gate), outsized
-daily move, or posture drift. Read-only; never trades.
-
-| Regime | Intended posture |
-|---|---|
-| Bull · calm | risk-on, full/levered exposure (≤1.8×), recovery + lowvol active |
-| Bull · volatile | vol-target de-levers, mean-reversion favored |
-| Bear / downtrend | de-risked: momentum → cash, lowvol → BIL, early-warning cut to 60% |
 
 ## Repository layout
-
 ```
 quant-agent/
-├── README.md / LESSONS.md / BOARD_SUMMARY.md   project docs + findings
-├── WALK_FORWARD_SETTINGS.md / RSI2_STRATEGY_SPEC.md
-├── config.py                       tunables (RISK thresholds, keys, DATA_DIR)
-├── orchestrator.py                 strategy lifecycle + agent routing
-│
+├── README.md  RESEARCH.md  LESSONS.md  BUILD_PLAN.md  STRATEGIES.md   docs + findings
+├── config.py                       tunables, RISK gate, alpaca_keys(1/2/3)
+├── analytics/                      ★ statistical rigor: significance, pbo, reality_check
+├── backtest/                       ★ look-ahead-free event engine (events/data/.../engine)
+├── ml/                             ★ purged CV, triple-barrier labels, features
 ├── agents/
-│   ├── daily_strategies.py         ★ daily strategies, $100k portfolio backtester,
-│   │                                  cross-sectional book, vol-targeting
-│   ├── strategy_ledger.py          persistent record of every strategy tried
-│   ├── research_agent / autonomous_agent / ml_research_agent   idea generation
-│   ├── code_agent / ml_code_agent / options_code_agent          codegen (+retry)
-│   ├── backtesting_agent.py        intraday engine + walk-forward + risk gate
-│   ├── risk_agent.py               config.RISK gate
-│   └── execution_agent.py          Alpaca paper orders (qty + fractional/notional)
-│
-├── runners/                        CLI entrypoints (see below)
-├── data/
-│   ├── sp500.py                    S&P 500 list + adjusted daily loader (yfinance)
-│   ├── yfinance_loader.py / multi_source.py / loader.py
-└── vector_stores/                  ChromaDB regime / strategy / research stores
+│   ├── daily_strategies.py         daily sleeves, $100k portfolio backtester, vol-target
+│   └── execution_agent.py          Alpaca paper orders (equities + options + trailing stops)
+├── runners/                        CLI entrypoints (rebalance, rigor, ML, diagnostics)
+├── app/dashboard.py                Streamlit control panel (3 books + AI monitor)
+├── tests/                          63 tests (rigor, engine, purged-CV, stop-guard, mapping)
+└── data/                           S&P 500 list + adjusted daily loader (yfinance)
 ```
-
-### Key runners
-| Script | Purpose |
-|---|---|
-| `deploy_check.py` | PnL + risk gate + walk-forward for every book + the deploy ensemble |
-| `daily_book.py` | board report for the daily books on any universe |
-| `daily_rebalance.py` | live/dry-run Alpaca paper rebalancer (the deploy path) |
-| `monitor.py` | daily regime-posture check + track-record (P&L vs SPY) + drawdown/drift alarms |
-| `regime_coverage.py` | audit: how the book performs in each market regime (bull/bear/volatile) |
-| `walk_forward_daily.py` | anchored walk-forward with per-fold parameter re-optimization |
-| `cross_sectional.py` | cross-sectional momentum / dual-momentum sweep |
-| `derisk_wf.py` | vol-targeting + walk-forward on the high-return books |
-| `strategy_lab.py` | candidate-strategy correlation lab + blend tuning |
-| `options_income.py` | no-leverage options income (put-write / covered call), modeled vol-risk-premium + VRP sensitivity |
-| `new_sleeves_screen.py` | screens candidate equity sleeves against the gate + marginal book value |
-| `fundamental_screen.py` | live quality/value screen (Finnhub fundamentals) + quality filter for the momentum sleeve |
-| `ml_alpha.py` | walk-forward ML (gradient-boosting) return predictor — benchmarked vs the rule-based sleeve |
-| `dump_daily_trades.py` | per-trade CSV logs |
-| `verify_trades_vs_yfinance.py` | data-integrity audit (fills vs yfinance OHLC) |
-| `data_quality_check.py` / `trade_stats.py` | data + win-rate significance diagnostics |
-| `full_auto_pipeline.py` | the multi-agent research→backtest→risk loop |
-
----
 
 ## Risk gate (`config.RISK`)
-
 ```python
-RISK = {"min_sharpe": 0.8, "max_drawdown": -0.15,
-        "min_win_rate": 0.45, "min_trades": 50}
+RISK = {"min_sharpe": 0.8, "max_drawdown": -0.15, "min_win_rate": 0.45, "min_trades": 50}
 ```
-A strategy graduates to paper trading only after passing this gate **and** a
-walk-forward (positive out-of-sample, positive in ≥4/5 folds).
+A strategy reaches paper trading only after passing this gate **and** a walk-forward
+(positive out-of-sample, positive in ≥ 4/5 folds) **and** the `analytics/` rigor battery.
 
-## Data
-
-Daily backtests use **split/dividend-adjusted yfinance** bars (set
-`DAILY_USE_ADJUSTED=0` to force the local 1-minute parquet, which is raw/
-unadjusted — a bug found and documented in LESSONS.md §8d). `data/cache/` and
-`results/` are reproducible outputs and are gitignored.
-
----
-
-See [LESSONS.md](LESSONS.md) before proposing experiments — it records every
-strategy tried and why it was kept or killed.
+## Read next
+- **[RESEARCH.md](RESEARCH.md)** — the full research report: rigor results, the skew
+  artifact, the BNY data glitch, the ML negatives, the diversification ceiling.
+- **[BUILD_PLAN.md](BUILD_PLAN.md)** — the 5-tier build (1A rigor, 1B write-up, 2A engine,
+  3 ML — all done; 2B Rust order book pending a toolchain).
+- **[LESSONS.md](LESSONS.md)** — every strategy tried and why it was kept or killed.
