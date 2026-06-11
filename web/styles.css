@@ -115,6 +115,22 @@ canvas{display:block}
 .panel-head h3{font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:.01em}
 .tag{font-size:10px;color:var(--dim2);border:1px solid var(--line2);border-radius:20px;padding:3px 9px;letter-spacing:.08em}
 
+/* live book */
+.live-panel{margin-bottom:16px}
+.live-dot{font-size:9px;letter-spacing:.16em;color:var(--up);margin-left:10px;display:inline-flex;align-items:center;gap:5px;vertical-align:middle}
+.live-dot i{width:6px;height:6px;border-radius:50%;background:var(--up);box-shadow:0 0 0 0 var(--glow);animation:ping 1.8s infinite}
+.live-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.live-card{border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:var(--bg2);
+  position:relative;overflow:hidden;opacity:0;animation:rise .5s forwards}
+.live-card.total{border-color:rgba(47,230,166,.32);background:linear-gradient(155deg,rgba(47,230,166,.09),var(--bg2))}
+.live-card.off{opacity:.45}
+.lc-name{font-size:10px;letter-spacing:.08em;color:var(--dim2);text-transform:uppercase;
+  display:flex;justify-content:space-between;gap:8px}
+.lc-name span{color:var(--faint);letter-spacing:0;text-transform:none}
+.lc-eq{font-family:var(--disp);font-weight:800;font-size:23px;margin-top:7px;font-variant-numeric:tabular-nums}
+.lc-row{display:flex;justify-content:space-between;align-items:center;margin-top:7px;font-size:11.5px;gap:8px}
+.lc-vs{color:var(--dim2);font-size:10px}
+
 /* equity chart */
 .chart-wrap{position:relative;height:240px}
 #equity{width:100%;height:212px;display:block}
@@ -224,7 +240,7 @@ canvas{display:block}
 .up{color:var(--up)}.amber{color:var(--bench)}.down{color:var(--down)}.cyan{color:var(--cyan)}
 
 @media(max-width:1080px){
-  .stat-row{grid-template-columns:repeat(2,1fr)}.grid-2,.control-grid{grid-template-columns:1fr}
+  .stat-row,.live-grid{grid-template-columns:repeat(2,1fr)}.grid-2,.control-grid{grid-template-columns:1fr}
   .roster{grid-template-columns:repeat(2,1fr)}:root{--rail:64px}
   .brand-txt,.nav-item span,.rail-foot{display:none}
 }

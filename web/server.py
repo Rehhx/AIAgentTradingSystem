@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 PY = sys.executable
 PORT = 8787
+sys.path.insert(0, str(ROOT))   # so in-process imports (config, agents, alpaca) resolve
 
 # REAL pipeline steps (run from ROOT). NONE contain --live -- this is enforced below.
 PIPELINE = [
@@ -55,6 +56,58 @@ assert not any("--live" in s["argv"] for s in PIPELINE), "live execution is not 
 
 RUN = {"id": 0, "lines": [], "phase": None, "status": "idle"}
 LOCK = threading.Lock()
+
+# read-only live account snapshot (cached 20s so polling doesn't hammer Alpaca)
+_ACCT = {"t": 0.0, "data": None}
+_ACCT_LOCK = threading.Lock()
+_ACCT_NAMES = {1: "Equity growth", 2: "Managed futures", 3: "LEAPS options"}
+
+
+def _account_snapshot():
+    now = time.time()
+    with _ACCT_LOCK:
+        if _ACCT["data"] and now - _ACCT["t"] < 20:
+            return _ACCT["data"]
+    out = {"accounts": [], "spy_today": None, "ts": time.strftime("%H:%M:%S")}
+    try:
+        import yfinance as yf
+        h = yf.Ticker("SPY").history(period="5d")["Close"].dropna()
+        if len(h) >= 2:
+            out["spy_today"] = float(h.iloc[-1] / h.iloc[-2] - 1)
+    except Exception:
+        pass
+    try:
+        from config import alpaca_keys, ALPACA_PAPER
+        from alpaca.trading.client import TradingClient
+    except Exception as e:
+        out["error"] = f"alpaca import failed: {e}"
+        return out
+    for acc in (1, 2, 3):
+        row = {"id": acc, "name": _ACCT_NAMES[acc], "status": "ok"}
+        key, sec = alpaca_keys(acc)
+        if not key or not sec:
+            row["status"] = "no-keys"
+            out["accounts"].append(row)
+            continue
+        try:
+            c = TradingClient(api_key=key, secret_key=sec, paper=ALPACA_PAPER)
+            a = c.get_account()
+            eq, last = float(a.equity), float(a.last_equity)
+            pos = c.get_all_positions()
+            top = sorted(pos, key=lambda p: -abs(float(p.market_value)))[:5]
+            row.update({"equity": eq, "last_equity": last, "cash": float(a.cash),
+                        "today": (eq / last - 1) if last else 0.0, "pl": eq - last,
+                        "n_pos": len(pos),
+                        "top": [{"sym": p.symbol.replace(".", "-"), "mv": float(p.market_value),
+                                 "pl": float(p.unrealized_pl)} for p in top]})
+        except Exception as e:
+            row["status"] = "error"
+            row["err"] = str(e)[:80]
+        out["accounts"].append(row)
+    with _ACCT_LOCK:
+        _ACCT["t"] = now
+        _ACCT["data"] = out
+    return out
 
 
 def _classify(t: str) -> str:
@@ -127,6 +180,8 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         if u.path == "/api/health":
             return self._send(200, json.dumps({"ok": True}))
+        if u.path == "/api/account":
+            return self._send(200, json.dumps(_account_snapshot()))
         if u.path == "/api/log":
             since = int((parse_qs(u.query).get("since", ["0"])[0]) or 0)
             with LOCK:

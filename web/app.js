@@ -54,7 +54,7 @@ function activateView(v){
   $$(".nav-item").forEach(n=>n.classList.toggle("is-active",n.dataset.view===v));
   $$(".view").forEach(x=>x.classList.remove("is-active"));
   $("#view-"+v).classList.add("is-active");
-  if(v==="dashboard"){drawEquity();countUp();}
+  if(v==="dashboard"){drawEquity();countUp();pollAccount();}
   if(v==="agents"){startField();} else if(fieldStop){fieldStop();fieldStop=null;}
   if(location.hash.slice(1)!==v)history.replaceState(null,"","#"+v);
 }
@@ -122,6 +122,37 @@ function renderEdge(){
     <div class="erow"><span>drawdown vs buy-hold</span><span class="up">−29% vs −54%</span></div>
     <div class="verdict">A <b>structural</b> risk premium arbitrage can't erase — net of MOC/MOO cost it's
       market-Sharpe with <b>half the drawdown</b>. Real, validated, not alpha: an overnight-beta sleeve.</div>`;
+}
+/* ---- live book feed (real Alpaca data via backend) ---- */
+const money=n=>"$"+Math.round(n).toLocaleString();
+function renderLive(d){
+  if(!d||!d.accounts){return;}
+  $("#livePanel").hidden=false;
+  const spy=d.spy_today;
+  $("#liveTs").textContent="updated "+d.ts+(spy!=null?` · SPY ${spy>=0?'+':''}${(spy*100).toFixed(2)}%`:"");
+  let tot=0,totPl=0,any=false;
+  const cards=d.accounts.map((a,i)=>{
+    if(a.status!=="ok"){
+      return `<div class="live-card off" style="animation-delay:${i*60}ms"><div class="lc-name">${a.name}<span>#${a.id}</span></div>
+        <div class="lc-eq" style="font-size:15px;color:var(--dim2)">${a.status==='no-keys'?'no keys':'offline'}</div></div>`;}
+    any=true;tot+=a.equity;totPl+=a.pl;
+    const up=a.today>=0,vs=spy!=null?a.today-spy:null;
+    return `<div class="live-card" style="animation-delay:${(i+1)*60}ms">
+      <div class="lc-name">${a.name}<span>#${a.id} · ${a.n_pos} pos</span></div>
+      <div class="lc-eq">${money(a.equity)}</div>
+      <div class="lc-row"><span class="${up?'up':'down'}">${up?'▲':'▼'} ${(a.today*100).toFixed(2)}%</span>
+        ${vs!=null?`<span class="lc-vs ${vs>=0?'up':'down'}">${vs>=0?'+':''}${(vs*100).toFixed(2)}% vs SPY</span>`:''}</div></div>`;
+  }).join("");
+  const tUp=totPl>=0;
+  const totalCard=`<div class="live-card total">
+    <div class="lc-name">Total book<span>${d.accounts.filter(a=>a.status==='ok').length}/3 live</span></div>
+    <div class="lc-eq">${any?money(tot):'—'}</div>
+    <div class="lc-row"><span class="${tUp?'up':'down'}">${tUp?'▲':'▼'} ${money(Math.abs(totPl))} today</span></div></div>`;
+  $("#liveGrid").innerHTML=totalCard+cards;
+}
+function pollAccount(){
+  if(!BACKEND)return;
+  fetch("/api/account").then(r=>r.json()).then(renderLive).catch(()=>{});
 }
 function drawEquity(){
   const svg=$("#equity");const W=svg.clientWidth||720,H=svg.clientHeight||212;
@@ -294,7 +325,8 @@ $("#power").addEventListener("click",orchestrate);
 // detect the backend; if present the Control page runs the REAL pipeline
 fetch("/api/health").then(r=>r.ok?r.json():null).then(j=>{
   if(j&&j.ok){BACKEND=true;$("#logState").textContent="backend live";$("#logState").classList.add("up");
-    $(".log-empty")&&($(".log-empty").textContent="// backend connected — one click runs the real pipeline");}
+    $(".log-empty")&&($(".log-empty").textContent="// backend connected — one click runs the real pipeline");
+    pollAccount();setInterval(pollAccount,25000);}
 }).catch(()=>{});
 
 /* ---------------- init ---------------- */
