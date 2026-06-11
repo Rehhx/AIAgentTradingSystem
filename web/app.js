@@ -242,32 +242,60 @@ function renderPhases(){
   $("#phaseTrack").innerHTML=PHASES.map(([k,i,l])=>`
     <div class="phase" data-k="${k}" style="--c:${COL[k]}"><span class="pi">${i}</span><span>${l}</span></div>`).join("");
 }
-let running=false;
+let running=false, BACKEND=false;
+const TAGOF={research:"tag-r",build:"tag-b",validate:"tag-v",execute:"tag-e"};
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function appendLine(ts,tag,txt,cls){
+  const log=$("#log");const ln=document.createElement("div");ln.className="ln";
+  ln.innerHTML=`<span class="ts">${ts||new Date().toLocaleTimeString("en-US",{hour12:false})}</span>`+
+    `<span class="${tag||''}">▌</span><span class="${cls||''}">${esc(txt)}</span>`;
+  log.appendChild(ln);log.scrollTop=log.scrollHeight;
+}
+function setPhase(prev,next){
+  if(prev&&prev!==next)$(`.phase[data-k="${prev}"]`)?.classList.replace("run","done");
+  if(next)$(`.phase[data-k="${next}"]`)?.classList.add("run");
+}
+function finishRun(label){
+  running=false;$("#power").classList.remove("armed");
+  $("#powerLabel").textContent=label||"LOOP COMPLETE";$("#logState").textContent="gated";
+  $$(".phase.run").forEach(p=>p.classList.remove("run"));
+}
 function orchestrate(){
   if(running)return;running=true;
-  const power=$("#power"),log=$("#log");
-  power.classList.add("armed");$("#powerLabel").textContent="RUNNING…";$("#logState").textContent="live";
-  log.innerHTML="";
-  $$(".phase").forEach(p=>p.classList.remove("run","done"));
-  let i=0,curPhase=null;
+  $("#power").classList.add("armed");$("#powerLabel").textContent="RUNNING…";
+  $("#log").innerHTML="";$$(".phase").forEach(p=>p.classList.remove("run","done"));
+  BACKEND?realRun():simulateRun();
+}
+function realRun(){
+  $("#logState").textContent="live · backend";
+  fetch("/api/run",{method:"POST"}).then(r=>r.json()).then(()=>{
+    let since=0,cur=null;
+    const poll=()=>fetch("/api/log?since="+since).then(r=>r.json()).then(d=>{
+      d.lines.forEach(L=>{since++;
+        if(L.phase!==cur){setPhase(cur,L.phase);cur=L.phase;}
+        appendLine(L.ts,TAGOF[L.phase],L.text,L.cls);});
+      if(d.status==="done"){setPhase(cur,null);finishRun("LOOP COMPLETE · GATED");}
+      else setTimeout(poll,350);
+    }).catch(()=>{appendLine("","err","[backend connection lost]","err");finishRun("DISCONNECTED");});
+    poll();
+  }).catch(()=>{BACKEND=false;simulateRun();});
+}
+function simulateRun(){
+  $("#logState").textContent="live · sim";let i=0,cur=null;
   (function next(){
-    if(i>=SCRIPT.length){running=false;$("#powerLabel").textContent="LOOP COMPLETE";
-      $("#logState").textContent="gated";$("#power").classList.remove("armed");
-      const lp=$(`.phase[data-k="execute"]`);lp.classList.remove("run");return;}
+    if(i>=SCRIPT.length){setPhase(cur,null);finishRun("LOOP COMPLETE · GATED");return;}
     const [ph,tag,txt,cls]=SCRIPT[i];
-    if(ph!==curPhase){
-      if(curPhase)$(`.phase[data-k="${curPhase}"]`).classList.replace("run","done");
-      $(`.phase[data-k="${ph}"]`).classList.add("run");curPhase=ph;
-      // light matching agents in roster (if rendered)
-    }
-    const ts=new Date().toLocaleTimeString("en-US",{hour12:false});
-    const ln=document.createElement("div");ln.className="ln";
-    ln.innerHTML=`<span class="ts">${ts}</span><span class="${tag}">▌</span><span class="${cls||''}">${txt}</span>`;
-    log.appendChild(ln);log.scrollTop=log.scrollHeight;
-    i++;setTimeout(next, txt.includes("AWAITING")?900: 420+Math.random()*340);
+    if(ph!==cur){setPhase(cur,ph);cur=ph;}
+    appendLine(new Date().toLocaleTimeString("en-US",{hour12:false}),tag,txt,cls);
+    i++;setTimeout(next, txt.includes("AWAITING")?900:420+Math.random()*340);
   })();
 }
 $("#power").addEventListener("click",orchestrate);
+// detect the backend; if present the Control page runs the REAL pipeline
+fetch("/api/health").then(r=>r.ok?r.json():null).then(j=>{
+  if(j&&j.ok){BACKEND=true;$("#logState").textContent="backend live";$("#logState").classList.add("up");
+    $(".log-empty")&&($(".log-empty").textContent="// backend connected — one click runs the real pipeline");}
+}).catch(()=>{});
 
 /* ---------------- init ---------------- */
 $("#span").textContent=DATA.span;
