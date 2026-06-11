@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QUANT·DESK — Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<!-- atmosphere -->
+<div class="grain" aria-hidden="true"></div>
+<div class="aurora" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<div class="app">
+  <!-- left rail -->
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-mark">◭</div>
+      <div class="brand-txt">
+        <b>QUANT·DESK</b>
+        <span>three-book engine</span>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button class="nav-item is-active" data-view="dashboard">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        <span>Dashboard</span><i></i>
+      </button>
+      <button class="nav-item" data-view="agents">
+        <svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.4"/><circle cx="5" cy="18" r="2.4"/><circle cx="19" cy="12" r="2.4"/><path d="M7 6.7 17 11M7 17.3 17 13"/></svg>
+        <span>AI Agents</span><i></i>
+      </button>
+      <button class="nav-item" data-view="control">
+        <svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
+        <span>Control</span><i></i>
+      </button>
+    </nav>
+
+    <div class="rail-foot">
+      <div class="kv"><span>tests</span><b class="up">63 ✓</b></div>
+      <div class="kv"><span>build</span><b>1A·1B·2A·3</b></div>
+      <div class="kv"><span>mode</span><b class="amber">PAPER</b></div>
+    </div>
+  </aside>
+
+  <!-- top status strip -->
+  <header class="topbar">
+    <div class="status">
+      <span class="live"><i></i>LIVE</span>
+      <span class="regime" id="regime">REGIME · BULL·CALM</span>
+      <span class="sep"></span>
+      <span class="muted" id="span">2016 — 2026 · adjusted daily</span>
+    </div>
+    <div class="heartbeat"><canvas id="pulse"></canvas></div>
+    <div class="clock" id="clock">--:--:--</div>
+  </header>
+
+  <!-- ===================== DASHBOARD ===================== -->
+  <main class="view is-active" id="view-dashboard">
+    <div class="view-head">
+      <h1 class="title"><span class="t-dim">the</span> honest book</h1>
+      <p class="sub">No alpha over SPY — so we compete on <b>risk</b>. Same return, a third less drawdown. Every number here survived our own rigor battery.</p>
+    </div>
+
+    <section class="stat-row" id="stats"></section>
+
+    <div class="grid-2">
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <h3>Equity · strategy vs S&amp;P 500</h3>
+          <div class="legend">
+            <span><i class="dot up"></i>market + sentinel</span>
+            <span><i class="dot amber"></i>buy &amp; hold SPY</span>
+          </div>
+        </div>
+        <div class="chart-wrap"><svg id="equity" preserveAspectRatio="none"></svg>
+          <div class="chart-foot" id="chartFoot"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h3>Rigor battery</h3><span class="tag">analytics/</span></div>
+        <div class="rigor" id="rigor"></div>
+      </section>
+    </div>
+
+    <div class="grid-2">
+      <section class="panel">
+        <div class="panel-head"><h3>Three books</h3><span class="tag">live · paper</span></div>
+        <div class="books" id="books"></div>
+      </section>
+      <section class="panel edge-panel">
+        <div class="panel-head"><h3>Edge search</h3><span class="tag">structural</span></div>
+        <div class="edge" id="edge"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ===================== AGENTS ===================== -->
+  <main class="view" id="view-agents">
+    <div class="view-head">
+      <h1 class="title"><span class="t-dim">12 agents,</span> one pipeline</h1>
+      <p class="sub">Research → build → validate → execute. Watch the desk check the market in real time.</p>
+      <button class="ghost-btn" id="checkMarket">⟳ check the market</button>
+    </div>
+    <section class="field-panel">
+      <canvas id="field"></canvas>
+      <div class="layer-labels">
+        <span style="--c:var(--cyan)">RESEARCH</span>
+        <span style="--c:var(--violet)">BUILD</span>
+        <span style="--c:var(--bench)">VALIDATE</span>
+        <span style="--c:var(--up)">EXECUTE</span>
+      </div>
+    </section>
+    <section class="roster" id="roster"></section>
+  </main>
+
+  <!-- ===================== CONTROL ===================== -->
+  <main class="view" id="view-control">
+    <div class="view-head">
+      <h1 class="title"><span class="t-dim">one click.</span> the whole loop.</h1>
+      <p class="sub">Activate the autonomous pipeline: research, build, validate, deploy — all gated behind a human authorization before any live order.</p>
+    </div>
+    <div class="control-grid">
+      <section class="panel reactor-panel">
+        <div class="reactor" id="reactor">
+          <button class="power" id="power">
+            <span class="power-ring"></span>
+            <span class="power-core">
+              <svg viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M5.6 5.6a9 9 0 1 0 12.8 0"/></svg>
+            </span>
+          </button>
+          <div class="power-label" id="powerLabel">ACTIVATE&nbsp;AGENTS</div>
+        </div>
+        <div class="phase-track" id="phaseTrack"></div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-head"><h3>orchestration log</h3><span class="tag" id="logState">idle</span></div>
+        <div class="log" id="log"><div class="log-empty">// awaiting activation…</div></div>
+      </section>
+    </div>
+    <p class="safety">🔒 Live execution is <b>gated</b>: the loop stops at <span class="amber">AWAITING HUMAN AUTHORIZATION</span> — no order reaches the broker without an explicit human go. This mirrors the real guardrail in the codebase.</p>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
