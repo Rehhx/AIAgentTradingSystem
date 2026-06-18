@@ -327,3 +327,48 @@ LAB_AGENTS = [
 ]
 
 FAMILY_COLOR = {"reversion": "cyan", "trend": "up", "volatility": "bench", "structure": "violet"}
+
+
+# ---------------------------------------------------------------------------
+# parameter SEARCH SPACE — so each lab run can sample a fresh batch. Every value
+# is a discrete choice around the hand-set default; sample_params() draws one
+# point per strategy, giving a genuinely different batch of candidates per run.
+# ---------------------------------------------------------------------------
+
+LAB_PARAM_SPACE = {
+    "coil_release":       {"coil": [6, 8, 10, 12], "ref": [40, 60, 80],
+                           "tight_pct": [0.20, 0.25, 0.30, 0.35], "hold": [6, 8, 10, 12, 14],
+                           "trend": [80, 100, 150]},
+    "drawdown_ladder":    {"rungs": [[0.03, 0.06, 0.10], [0.04, 0.08, 0.13],
+                                     [0.05, 0.10, 0.16], [0.04, 0.08, 0.12, 0.18]],
+                           "high_lb": [80, 100, 120], "trend": [200, 250, 300]},
+    "velocity_flip":      {"smooth": [8, 10, 12, 14], "slope": [4, 5, 6, 7],
+                           "trend": [80, 100, 150], "hold": [8, 10, 12, 16]},
+    "trend_persistence":  {"win": [15, 20, 25, 30], "persist_thr": [0.55, 0.60, 0.62, 0.65, 0.70],
+                           "trend": [100, 120, 150]},
+    "vol_regime_switch":  {"vol_lb": [15, 20, 25, 30], "ref": [200, 252], "trend": [150, 200, 250]},
+    "gap_fade_revert":    {"gap_k": [0.8, 1.0, 1.1, 1.3, 1.5], "trend": [120, 150, 200],
+                           "hold": [2, 3, 4, 5], "vol_lb": [15, 20, 25]},
+    "breadth_thrust_self": {"n": [15, 20, 25], "ma": [8, 10, 12], "lo": [0.25, 0.30, 0.35],
+                            "hi": [0.70, 0.75, 0.80], "hold": [10, 15, 20]},
+    "mean_gravity":       {"anchor": [80, 100, 120], "g": [2.0, 2.5, 3.0, 3.5],
+                           "atr": [14, 20, 25], "trend": [150, 200, 250]},
+    "streak_reversal":    {"k": [3, 4, 5, 6], "trend": [150, 200, 250], "hold": [3, 5, 7, 10]},
+    "expansion_breakout": {"m": [1.5, 1.8, 2.0, 2.2, 2.5], "atr": [14, 20, 25],
+                           "trend": [80, 100, 150], "hold": [5, 8, 10, 12]},
+    "slope_quality":      {"win": [30, 40, 50, 60], "r2_min": [0.50, 0.55, 0.60, 0.65]},
+    "dual_horizon_agree": {"slow": [150, 200, 250], "fast_lb": [8, 10, 12, 15],
+                           "dip": [-0.03, -0.04, -0.05, -0.06], "hold": [8, 10, 12]},
+}
+
+
+def sample_params(name, rng=None):
+    """draw one parameter point for `name` from its search space. With no rng,
+    falls back to the hand-set LAB_PARAMS default (deterministic)."""
+    if rng is None:
+        return dict(LAB_PARAMS.get(name, {}))
+    space = LAB_PARAM_SPACE.get(name)
+    if not space:
+        return dict(LAB_PARAMS.get(name, {}))
+    return {k: (list(rng.choice(v)) if isinstance(v[0], list) else rng.choice(v))
+            for k, v in space.items()}

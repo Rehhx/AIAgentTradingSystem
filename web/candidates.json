@@ -1,66 +1,38 @@
 {
-  "generated": "2026-06-18T06:50:31+00:00",
+  "generated": "2026-06-18T07:08:20+00:00",
+  "seed": 1781766493,
   "benchmark": {
     "sharpe": 1.591,
     "cagr": 0.1051,
     "maxdd": -0.0775
   },
-  "sr_star_annual": 0.674,
+  "sr_star_annual": 0.816,
   "candidates": [
-    {
-      "agent": "gravity",
-      "strategy": "mean_gravity",
-      "family": "reversion",
-      "thesis": "stretch below a long anchor in ATR units mean-reverts to the anchor",
-      "params": {
-        "anchor": 100,
-        "g": 2.5,
-        "atr": 20,
-        "trend": 200
-      },
-      "sharpe": 0.785,
-      "maxdd": -0.0371,
-      "corr": 0.217,
-      "blend": 1.612,
-      "delta": 0.0216,
-      "wf_pos": 5,
-      "wf_n": 5,
-      "wf_folds": [
-        1.32,
-        0.57,
-        0.56,
-        1.66,
-        0.83
-      ],
-      "dsr": 0.6415,
-      "verdict": "REVIEW",
-      "reason": "improves the blend but DSR 64%"
-    },
     {
       "agent": "regime-dial",
       "strategy": "vol_regime_switch",
       "family": "volatility",
       "thesis": "size inversely to the volatility percentile - full when calm, flat when stormy",
       "params": {
-        "vol_lb": 20,
-        "ref": 252,
-        "trend": 200
+        "vol_lb": 25,
+        "ref": 200,
+        "trend": 250
       },
-      "sharpe": 1.366,
-      "maxdd": -0.0557,
-      "corr": 0.808,
-      "blend": 1.597,
-      "delta": 0.006,
+      "sharpe": 1.387,
+      "maxdd": -0.0618,
+      "corr": 0.814,
+      "blend": 1.598,
+      "delta": 0.0077,
       "wf_pos": 5,
       "wf_n": 5,
       "wf_folds": [
-        2.14,
-        0.96,
-        1.78,
-        0.93,
-        1.17
+        2.38,
+        0.7,
+        1.81,
+        0.97,
+        1.29
       ],
-      "dsr": 0.9852,
+      "dsr": 0.9632,
       "verdict": "REVIEW",
       "reason": "improves the blend but corr too high"
     },
@@ -70,9 +42,9 @@
       "family": "trend",
       "thesis": "a name's own internal breadth thrust signals broad-based ignition",
       "params": {
-        "n": 20,
-        "ma": 10,
-        "lo": 0.3,
+        "n": 15,
+        "ma": 8,
+        "lo": 0.25,
         "hi": 0.75,
         "hold": 15
       },
@@ -90,7 +62,94 @@
         0.0,
         0.0
       ],
-      "dsr": 0.015,
+      "dsr": 0.0043,
+      "verdict": "REJECT",
+      "reason": "does not improve the blended book (the ensemble already owns this)"
+    },
+    {
+      "agent": "coil-scout",
+      "strategy": "coil_release",
+      "family": "volatility",
+      "thesis": "compressed ranges store energy that releases upward - trade the transition",
+      "params": {
+        "coil": 6,
+        "ref": 80,
+        "tight_pct": 0.3,
+        "hold": 10,
+        "trend": 80
+      },
+      "sharpe": 1.295,
+      "maxdd": -0.1509,
+      "corr": 0.786,
+      "blend": 1.589,
+      "delta": -0.0013,
+      "wf_pos": 5,
+      "wf_n": 5,
+      "wf_folds": [
+        2.5,
+        1.02,
+        1.44,
+        0.28,
+        1.91
+      ],
+      "dsr": 0.9307,
+      "verdict": "REJECT",
+      "reason": "does not improve the blended book (the ensemble already owns this)"
+    },
+    {
+      "agent": "gravity",
+      "strategy": "mean_gravity",
+      "family": "reversion",
+      "thesis": "stretch below a long anchor in ATR units mean-reverts to the anchor",
+      "params": {
+        "anchor": 80,
+        "g": 3.0,
+        "atr": 25,
+        "trend": 150
+      },
+      "sharpe": 0.194,
+      "maxdd": -0.0408,
+      "corr": 0.158,
+      "blend": 1.587,
+      "delta": -0.0036,
+      "wf_pos": 3,
+      "wf_n": 5,
+      "wf_folds": [
+        0.66,
+        -0.33,
+        -0.0,
+        1.11,
+        1.01
+      ],
+      "dsr": 0.022,
+      "verdict": "REJECT",
+      "reason": "does not improve the blended book (the ensemble already owns this)"
+    },
+    {
+      "agent": "streakwatch",
+      "strategy": "streak_reversal",
+      "family": "reversion",
+      "thesis": "rare consecutive down-streaks in an uptrend are short-term overreactions",
+      "params": {
+        "k": 5,
+        "trend": 250,
+        "hold": 7
+      },
+      "sharpe": 0.565,
+      "maxdd": -0.0257,
+      "corr": 0.38,
+      "blend": 1.586,
+      "delta": -0.0042,
+      "wf_pos": 5,
+      "wf_n": 5,
+      "wf_folds": [
+        0.96,
+        0.2,
+        0.39,
+        0.38,
+        1.17
+      ],
+      "dsr": 0.2083,
       "verdict": "REJECT",
       "reason": "does not improve the blended book (the ensemble already owns this)"
     },
@@ -101,87 +160,28 @@
       "thesis": "accumulate deeper-into-the-dip in a secular uptrend, scale out on recovery",
       "params": {
         "rungs": [
-          0.04,
-          0.08,
-          0.13
+          0.05,
+          0.1,
+          0.16
         ],
-        "high_lb": 100,
-        "trend": 250
+        "high_lb": 80,
+        "trend": 200
       },
-      "sharpe": 0.893,
-      "maxdd": -0.0934,
-      "corr": 0.574,
-      "blend": 1.582,
-      "delta": -0.009,
-      "wf_pos": 5,
+      "sharpe": 0.778,
+      "maxdd": -0.0721,
+      "corr": 0.532,
+      "blend": 1.581,
+      "delta": -0.0096,
+      "wf_pos": 4,
       "wf_n": 5,
       "wf_folds": [
-        1.92,
-        0.05,
-        1.57,
-        1.2,
-        0.72
+        1.33,
+        -0.15,
+        1.34,
+        1.11,
+        0.82
       ],
-      "dsr": 0.7596,
-      "verdict": "REJECT",
-      "reason": "does not improve the blended book (the ensemble already owns this)"
-    },
-    {
-      "agent": "coil-scout",
-      "strategy": "coil_release",
-      "family": "volatility",
-      "thesis": "compressed ranges store energy that releases upward - trade the transition",
-      "params": {
-        "coil": 8,
-        "ref": 60,
-        "tight_pct": 0.3,
-        "hold": 10,
-        "trend": 100
-      },
-      "sharpe": 1.14,
-      "maxdd": -0.1632,
-      "corr": 0.761,
-      "blend": 1.57,
-      "delta": -0.0205,
-      "wf_pos": 5,
-      "wf_n": 5,
-      "wf_folds": [
-        2.54,
-        0.71,
-        1.27,
-        0.35,
-        1.46
-      ],
-      "dsr": 0.9283,
-      "verdict": "REJECT",
-      "reason": "does not improve the blended book (the ensemble already owns this)"
-    },
-    {
-      "agent": "nightfade",
-      "strategy": "gap_fade_revert",
-      "family": "reversion",
-      "thesis": "panic gap-down opens in an uptrend overshoot and snap back",
-      "params": {
-        "gap_k": 1.1,
-        "trend": 150,
-        "hold": 3,
-        "vol_lb": 20
-      },
-      "sharpe": 0.432,
-      "maxdd": -0.0683,
-      "corr": 0.395,
-      "blend": 1.568,
-      "delta": -0.0229,
-      "wf_pos": 3,
-      "wf_n": 5,
-      "wf_folds": [
-        1.63,
-        -0.45,
-        1.47,
-        -0.03,
-        0.25
-      ],
-      "dsr": 0.227,
+      "dsr": 0.4516,
       "verdict": "REJECT",
       "reason": "does not improve the blended book (the ensemble already owns this)"
     },
@@ -191,26 +191,55 @@
       "family": "structure",
       "thesis": "act only when a slow uptrend and a fast turn-up agree",
       "params": {
-        "slow": 200,
-        "fast_lb": 10,
-        "dip": -0.04,
+        "slow": 150,
+        "fast_lb": 15,
+        "dip": -0.05,
         "hold": 10
       },
-      "sharpe": 0.668,
-      "maxdd": -0.0877,
-      "corr": 0.489,
-      "blend": 1.561,
-      "delta": -0.03,
+      "sharpe": 0.627,
+      "maxdd": -0.0853,
+      "corr": 0.415,
+      "blend": 1.576,
+      "delta": -0.0147,
       "wf_pos": 5,
       "wf_n": 5,
       "wf_folds": [
-        1.05,
-        0.22,
-        0.88,
-        1.06,
-        0.78
+        0.66,
+        0.07,
+        0.8,
+        1.16,
+        1.0
       ],
-      "dsr": 0.492,
+      "dsr": 0.2725,
+      "verdict": "REJECT",
+      "reason": "does not improve the blended book (the ensemble already owns this)"
+    },
+    {
+      "agent": "nightfade",
+      "strategy": "gap_fade_revert",
+      "family": "reversion",
+      "thesis": "panic gap-down opens in an uptrend overshoot and snap back",
+      "params": {
+        "gap_k": 1.5,
+        "trend": 150,
+        "hold": 3,
+        "vol_lb": 20
+      },
+      "sharpe": 0.179,
+      "maxdd": -0.0644,
+      "corr": 0.294,
+      "blend": 1.567,
+      "delta": -0.0231,
+      "wf_pos": 3,
+      "wf_n": 5,
+      "wf_folds": [
+        0.94,
+        -0.26,
+        0.7,
+        -0.26,
+        0.28
+      ],
+      "dsr": 0.0242,
       "verdict": "REJECT",
       "reason": "does not improve the blended book (the ensemble already owns this)"
     },
@@ -221,52 +250,24 @@
       "thesis": "the smoothness of a climb, not its slope, predicts continuation",
       "params": {
         "win": 20,
-        "persist_thr": 0.62,
+        "persist_thr": 0.7,
         "trend": 120
       },
-      "sharpe": 0.673,
-      "maxdd": -0.0636,
-      "corr": 0.601,
-      "blend": 1.557,
-      "delta": -0.0334,
-      "wf_pos": 5,
+      "sharpe": -0.129,
+      "maxdd": -0.0399,
+      "corr": 0.294,
+      "blend": 1.565,
+      "delta": -0.0258,
+      "wf_pos": 2,
       "wf_n": 5,
       "wf_folds": [
-        1.6,
-        0.62,
-        0.23,
-        0.38,
-        1.0
+        -0.2,
+        0.27,
+        -0.42,
+        0.6,
+        -0.5
       ],
-      "dsr": 0.4984,
-      "verdict": "REJECT",
-      "reason": "does not improve the blended book (the ensemble already owns this)"
-    },
-    {
-      "agent": "streakwatch",
-      "strategy": "streak_reversal",
-      "family": "reversion",
-      "thesis": "rare consecutive down-streaks in an uptrend are short-term overreactions",
-      "params": {
-        "k": 4,
-        "trend": 200,
-        "hold": 5
-      },
-      "sharpe": 0.326,
-      "maxdd": -0.0673,
-      "corr": 0.432,
-      "blend": 1.555,
-      "delta": -0.0354,
-      "wf_pos": 4,
-      "wf_n": 5,
-      "wf_folds": [
-        1.75,
-        -0.72,
-        0.54,
-        0.57,
-        0.28
-      ],
-      "dsr": 0.1331,
+      "dsr": 0.0011,
       "verdict": "REJECT",
       "reason": "does not improve the blended book (the ensemble already owns this)"
     },
@@ -276,24 +277,24 @@
       "family": "trend",
       "thesis": "grade exposure by the R-squared of the up-trend - buy clean, refuse ragged",
       "params": {
-        "win": 40,
-        "r2_min": 0.55
+        "win": 50,
+        "r2_min": 0.65
       },
-      "sharpe": 0.635,
-      "maxdd": -0.0671,
-      "corr": 0.681,
-      "blend": 1.548,
-      "delta": -0.043,
-      "wf_pos": 5,
+      "sharpe": 0.578,
+      "maxdd": -0.0511,
+      "corr": 0.657,
+      "blend": 1.551,
+      "delta": -0.0392,
+      "wf_pos": 4,
       "wf_n": 5,
       "wf_folds": [
-        1.07,
-        0.38,
-        0.76,
-        0.17,
-        0.96
+        0.69,
+        0.25,
+        0.92,
+        -0.03,
+        1.11
       ],
-      "dsr": 0.451,
+      "dsr": 0.2284,
       "verdict": "REJECT",
       "reason": "does not improve the blended book (the ensemble already owns this)"
     },
@@ -303,26 +304,26 @@
       "family": "trend",
       "thesis": "price acceleration turns before the trend cross - buy the inflection",
       "params": {
-        "smooth": 10,
-        "slope": 5,
-        "trend": 100,
+        "smooth": 8,
+        "slope": 4,
+        "trend": 80,
         "hold": 12
       },
-      "sharpe": 0.963,
-      "maxdd": -0.0974,
-      "corr": 0.75,
-      "blend": 1.542,
-      "delta": -0.0487,
+      "sharpe": 0.989,
+      "maxdd": -0.1072,
+      "corr": 0.797,
+      "blend": 1.528,
+      "delta": -0.0624,
       "wf_pos": 5,
       "wf_n": 5,
       "wf_folds": [
-        2.06,
-        0.11,
-        1.31,
-        0.5,
-        1.11
+        2.46,
+        0.39,
+        0.8,
+        0.57,
+        1.25
       ],
-      "dsr": 0.8189,
+      "dsr": 0.7055,
       "verdict": "REJECT",
       "reason": "does not improve the blended book (the ensemble already owns this)"
     },
@@ -332,26 +333,26 @@
       "family": "volatility",
       "thesis": "a true-range blow-out closing strong ignites a multi-day move",
       "params": {
-        "m": 1.8,
+        "m": 1.5,
         "atr": 20,
-        "trend": 100,
-        "hold": 8
+        "trend": 150,
+        "hold": 5
       },
-      "sharpe": 0.101,
-      "maxdd": -0.1355,
-      "corr": 0.466,
-      "blend": 1.522,
-      "delta": -0.0682,
+      "sharpe": 0.219,
+      "maxdd": -0.1364,
+      "corr": 0.487,
+      "blend": 1.52,
+      "delta": -0.0709,
       "wf_pos": 2,
       "wf_n": 5,
       "wf_folds": [
-        2.08,
-        -0.39,
-        -0.41,
-        -0.17,
-        0.64
+        2.27,
+        -0.43,
+        -0.16,
+        -0.12,
+        0.89
       ],
-      "dsr": 0.0337,
+      "dsr": 0.0287,
       "verdict": "REJECT",
       "reason": "does not improve the blended book (the ensemble already owns this)"
     }

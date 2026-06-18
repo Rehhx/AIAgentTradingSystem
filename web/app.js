@@ -3,14 +3,14 @@
    ============================================================ */
 const DATA = {
   span: "2016 — 2026 · adjusted daily",
-  // real yearly returns from runners/market_park_backtest.py
+  // real yearly returns of OUR equity ensemble book vs SPY (build_ensemble())
   years: [2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026],
-  spy:   [12.0,21.7,-4.6,31.2,18.3,28.7,-18.2,26.2,24.9,17.7,8.7],
-  strat: [10.2,21.6,-1.0,23.7,21.0,27.5,-17.1,26.2,21.5,20.3,6.6],
+  spy:   [13.6,21.7,-4.6,31.2,18.3,28.7,-18.2,26.2,24.9,17.7,11.0],
+  strat: [3.1,12.3,1.8,11.7,16.7,14.2,-3.8,15.9,17.2,13.5,8.5],
   stats: [
-    {k:"Sharpe",        v:0.97,  d:"vs SPY 0.82",      vc:"var(--up)",  dec:2, sc:"rgba(47,230,166,.12)"},
-    {k:"CAGR",          v:13.6,  d:"market + sentinel", vc:"var(--text)",suf:"%",dec:1},
-    {k:"Max Drawdown",  v:-22.8, d:"vs SPY −33.7%",     vc:"var(--up)",  suf:"%",dec:1},
+    {k:"Sharpe",        v:1.59,  d:"vs SPY 0.82",        vc:"var(--up)",  dec:2, sc:"rgba(47,230,166,.12)"},
+    {k:"CAGR",          v:10.5,  d:"equity ensemble",    vc:"var(--text)",suf:"%",dec:1},
+    {k:"Max Drawdown",  v:-7.8,  d:"vs SPY −33.7%",      vc:"var(--up)",  suf:"%",dec:1},
     {k:"Walk-forward",  v:5,     d:"of 5 folds positive",vc:"var(--text)",suf:"/5"},
     {k:"Unit tests",    v:63,    d:"rigor · engine · CV",vc:"var(--cyan)",suf:" ✓"},
   ],
@@ -327,6 +327,7 @@ function renderCandidates(data){
           <div><div class="cand-agent">${esc2(c.agent)}</div><div class="cand-strat">${esc2(c.strategy)}</div></div>
           <span class="vpill ${vc}">${c.verdict}</span></div>
         <div class="cand-thesis">${esc2(c.thesis)}</div>
+        ${c.params?`<div class="cand-params">${esc2(Object.entries(c.params).map(([k,v])=>k+' '+v).join(' · '))}</div>`:''}
         <div class="cand-metrics">
           <div><span>SHARPE</span><b>${c.sharpe.toFixed(2)}</b></div>
           <div><span>CORR</span><b class="${lc?'up':''}">${c.corr>=0?'+':''}${c.corr.toFixed(2)}</b></div>

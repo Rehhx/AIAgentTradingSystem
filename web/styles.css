@@ -297,6 +297,7 @@ canvas{display:block}
 .vpill.amber{color:var(--bench);border-color:rgba(245,168,59,.35);background:rgba(245,168,59,.06)}
 .vpill.down{color:var(--down);border-color:rgba(255,93,115,.3);background:rgba(255,93,115,.05)}
 .cand-thesis{font-size:11px;color:var(--dim);line-height:1.45;min-height:32px}
+.cand-params{font-size:9px;color:var(--dim2);line-height:1.4;word-break:break-word}
 .cand-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 6px;padding:9px 0;
   border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .cand-metrics div{display:flex;flex-direction:column;gap:2px}

@@ -24,6 +24,7 @@ disposes.
 """
 import argparse
 import json
+import random
 import sys
 import time
 from datetime import datetime, timezone
@@ -46,7 +47,7 @@ from agents.daily_strategies import (
     backtest_book, vol_target, walk_forward_folds, _metrics_from_returns,
     daily_bars, QUALITY_UNIVERSE, TRADING_DAYS,
 )
-from agents.lab_strategies import LAB_STRATEGIES, LAB_PARAMS, LAB_AGENTS
+from agents.lab_strategies import LAB_STRATEGIES, LAB_AGENTS, sample_params
 from analytics.significance import (
     sharpe_stats, expected_max_sharpe, probabilistic_sharpe_ratio,
 )
@@ -63,9 +64,9 @@ def _say(phase, agent, msg, flush=True):
     print(f"{tag} | {agent:<14s} | {msg}", flush=flush)
 
 
-def candidate_series(name):
+def candidate_series(name, params):
     fn = LAB_STRATEGIES[name]
-    b = backtest_book(fn, QUALITY_UNIVERSE, LAB_PARAMS.get(name), label=name)
+    b = backtest_book(fn, QUALITY_UNIVERSE, params, label=name)
     if "error" in b:
         return None
     return _naive(vol_target(b["_returns"], target_vol=0.12, max_leverage=1.0)), b
@@ -87,12 +88,15 @@ def _verdict(delta, corr, wf_pos, wf_n, dsr):
     return "REJECT", "does not improve the blended book (the ensemble already owns this)"
 
 
-def run(emit_path=None):
+def run(emit_path=None, seed=None):
     t0 = time.time()
+    seed = int(time.time()) if seed is None else int(seed)
+    rng = random.Random(seed)
     print("=" * 78, flush=True)
     print("AUTONOMOUS AGENT LAB | 12 agents | research -> build -> validate -> execute",
           flush=True)
     print("=" * 78, flush=True)
+    print(f"batch seed {seed} - each run samples a fresh parameter set per agent", flush=True)
     print("booting benchmark: building the live equity ensemble (~1-2 min)...\n", flush=True)
 
     ens = build_ensemble()
@@ -101,12 +105,15 @@ def run(emit_path=None):
     print(f"BENCHMARK | equity ensemble book | Sharpe {ens_sh:.2f} | "
           f"CAGR {em['cagr']:.1%} | maxDD {em['max_drawdown']:.1%}\n", flush=True)
 
-    # first pass: build every candidate's return series (needed for the deflation set)
-    series, books, order = {}, {}, []
+    # first pass: sample THIS run's params + build every candidate's return series
+    # (the param draw is what makes each click a different batch of strategies)
+    series, books, order, used = {}, {}, [], {}
     for spec in LAB_AGENTS:
         name, agent = spec["strategy"], spec["agent"]
+        params = sample_params(name, rng)
+        used[name] = params
         try:
-            res = candidate_series(name)
+            res = candidate_series(name, params)
         except Exception as e:
             _say("build", agent, f"FAILED to compile {name}: {e}")
             continue
@@ -132,8 +139,8 @@ def run(emit_path=None):
         _say("research", agent, f"hypothesis: {spec['thesis']}")
 
         # ---- build -----------------------------------------------------------
-        nparam = len(LAB_PARAMS.get(name, {}))
-        _say("build", agent, f"compiled signal | {nparam} params | long/flat | "
+        params = used[name]
+        _say("build", agent, f"compiled signal | params {params} | long/flat | "
                              f"shift=1 (no look-ahead) | {len(r)} bars")
 
         # ---- validate --------------------------------------------------------
@@ -161,8 +168,7 @@ def run(emit_path=None):
 
         # ---- execute (DRY-RUN) ----------------------------------------------
         try:
-            target = float(LAB_STRATEGIES[name](daily_bars("SPY"),
-                                                LAB_PARAMS.get(name)).iloc[-1])
+            target = float(LAB_STRATEGIES[name](daily_bars("SPY"), params).iloc[-1])
         except Exception:
             target = 0.0
         sleeve_usd = NOMINAL_BOOK * SLEEVE_W
@@ -176,7 +182,7 @@ def run(emit_path=None):
 
         results.append({
             "agent": agent, "strategy": name, "family": spec["family"],
-            "thesis": spec["thesis"], "params": LAB_PARAMS.get(name, {}),
+            "thesis": spec["thesis"], "params": params,
             "sharpe": round(sh, 3), "maxdd": round(dd, 4), "corr": round(corr, 3),
             "blend": round(bsh, 3), "delta": round(delta, 4),
             "wf_pos": wf_pos, "wf_n": len(folds), "wf_folds": fold_srs,
@@ -204,6 +210,7 @@ def run(emit_path=None):
 
     payload = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "seed": seed,
         "benchmark": {"sharpe": round(ens_sh, 3), "cagr": round(em["cagr"], 4),
                       "maxdd": round(em["max_drawdown"], 4)},
         "sr_star_annual": round(sr_star * np.sqrt(TRADING_DAYS), 3),
@@ -220,8 +227,10 @@ def run(emit_path=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--emit", default=None, help="write candidates JSON to this path")
+    ap.add_argument("--seed", default=None, type=int,
+                    help="fix the batch seed (default: time-based -> a new batch each run)")
     args = ap.parse_args()
-    run(emit_path=args.emit)
+    run(emit_path=args.emit, seed=args.seed)
 
 
 if __name__ == "__main__":
