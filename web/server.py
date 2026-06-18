@@ -55,8 +55,8 @@ PIPELINE = [
 # each agent researches an ORIGINAL mechanism, then build/validate/execute, and
 # the candidates are written to web/candidates.json for human approval.
 AGENT_PIPELINE = [
-    {"phase": "agents", "label": "12 agents | research -> build -> validate -> execute",
-     "argv": [PY, "-u", "runners/agent_lab.py", "--emit", "web/candidates.json"],
+    {"phase": "agents", "label": "12 agents | invent -> build -> validate -> execute",
+     "argv": [PY, "-u", "runners/agent_lab.py", "--llm", "--emit", "web/candidates.json"],
      "timeout": 600},
 ]
 

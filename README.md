@@ -97,9 +97,18 @@ human to approve or reject what survives. Launchable in one click from the web c
   marginal contribution of a 15% sleeve, then stress-tested with walk-forward folds and a
   **deflated Sharpe corrected for searching 12 trials**. Every candidate gets a
   PROMOTE / REVIEW / REJECT recommendation written to `web/candidates.json`.
+* **`agents/llm_strategist.py` — LLM-INVENTED mechanisms.** The cockpit button (and
+  `agent_lab.py --llm`) has Claude invent a fresh batch of original signals each run, as
+  small Python functions. Because this executes model-written code, two hard guards run
+  *before* any backtest: an **AST sandbox** (no imports / file-IO / eval / dunders / pandas
+  `.eval`·`.query`·`.to_*`·`read_*`) and a **look-ahead probe** (recompute on truncated
+  history — reject anything whose past value changes once the future is hidden, catching
+  global `.max()`, negative `.shift()`, future indices). Unreachable LLM → it falls back to
+  the parameter-search batch, so the button always works.
 * **Human-in-the-loop.** The cockpit renders each candidate as a card with its metrics and a
-  ✓ approve / ✕ reject button (`/api/decide` → `web/decisions.json`). **The machine proposes;
-  the human disposes** — nothing here ever places a live order.
+  ✓ approve / ✕ reject button (`/api/decide` → `web/decisions.json`); approve also adds the
+  sleeve to `web/book.json`. **The machine proposes; the human disposes** — nothing here ever
+  places a live order.
 
 **Honest result (latest run):** of 12 original mechanisms, **2 raise the blended Sharpe** —
 `mean_gravity` (corr **+0.22**, blend **1.61**, 5/5 folds) is a genuine low-correlation

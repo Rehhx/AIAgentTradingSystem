@@ -64,12 +64,61 @@ def _say(phase, agent, msg, flush=True):
     print(f"{tag} | {agent:<14s} | {msg}", flush=flush)
 
 
-def candidate_series(name, params):
-    fn = LAB_STRATEGIES[name]
-    b = backtest_book(fn, QUALITY_UNIVERSE, params, label=name)
+def candidate_series(fn, params, label):
+    b = backtest_book(fn, QUALITY_UNIVERSE, params, label=label)
     if "error" in b:
         return None
     return _naive(vol_target(b["_returns"], target_vol=0.12, max_leverage=1.0)), b
+
+
+def _llm_batch(n, seed):
+    """ask the LLM to INVENT n new mechanisms; compile + look-ahead-vet each.
+    returns a list of specs with a compiled `fn`. [] if the LLM is unreachable."""
+    from agents.llm_strategist import propose_batch, validate_spec
+    avoid = list(LAB_STRATEGIES) + ["rsi", "macd", "bollinger", "donchian"]
+    proposals = propose_batch(n, avoid=avoid, seed=seed)
+    if not proposals:
+        return []
+    probe = daily_bars("SPY")
+    specs, seen = [], set()
+    for p in proposals:
+        name = str(p.get("name", "")).strip().lower().replace(" ", "_")
+        if not name or name in seen:
+            continue
+        fn, why = validate_spec(p, probe)
+        handle = "llm-" + name.replace("_", "-")[:18]
+        if fn is None:
+            _say("build", handle, f"rejected invented '{name}': {why}")
+            continue
+        seen.add(name)
+        specs.append({"agent": handle, "strategy": name, "family": p.get("family", "structure"),
+                      "thesis": p.get("thesis", "(llm-invented)"), "params": p.get("params") or {},
+                      "fn": fn, "code": p.get("code", ""), "source": "llm"})
+        if len(specs) >= n:
+            break
+    return specs
+
+
+def _build_batch(rng, use_llm, n=12):
+    """assemble this run's batch. LLM-invented mechanisms first (when reachable),
+    then fill the remainder from the deterministic parameter-search lab."""
+    specs = []
+    if use_llm:
+        try:
+            specs = _llm_batch(n, seed=rng.randint(1, 10 ** 9))
+        except Exception as e:
+            _say("research", "llm", f"LLM unavailable ({str(e)[:50]}) - using param-search batch")
+    taken = {s["strategy"] for s in specs}
+    for spec in LAB_AGENTS:
+        if len(specs) >= n:
+            break
+        name = spec["strategy"]
+        if name in taken:
+            continue
+        specs.append({"agent": spec["agent"], "strategy": name, "family": spec["family"],
+                      "thesis": spec["thesis"], "params": sample_params(name, rng),
+                      "fn": LAB_STRATEGIES[name], "code": "", "source": "lab"})
+    return specs[:n]
 
 
 def _verdict(delta, corr, wf_pos, wf_n, dsr):
@@ -88,7 +137,7 @@ def _verdict(delta, corr, wf_pos, wf_n, dsr):
     return "REJECT", "does not improve the blended book (the ensemble already owns this)"
 
 
-def run(emit_path=None, seed=None):
+def run(emit_path=None, seed=None, use_llm=False):
     t0 = time.time()
     seed = int(time.time()) if seed is None else int(seed)
     rng = random.Random(seed)
@@ -96,7 +145,8 @@ def run(emit_path=None, seed=None):
     print("AUTONOMOUS AGENT LAB | 12 agents | research -> build -> validate -> execute",
           flush=True)
     print("=" * 78, flush=True)
-    print(f"batch seed {seed} - each run samples a fresh parameter set per agent", flush=True)
+    mode = "LLM-invented mechanisms" if use_llm else "parameter-search batch"
+    print(f"batch seed {seed} | mode: {mode} (fresh batch each run)", flush=True)
     print("booting benchmark: building the live equity ensemble (~1-2 min)...\n", flush=True)
 
     ens = build_ensemble()
@@ -105,43 +155,44 @@ def run(emit_path=None, seed=None):
     print(f"BENCHMARK | equity ensemble book | Sharpe {ens_sh:.2f} | "
           f"CAGR {em['cagr']:.1%} | maxDD {em['max_drawdown']:.1%}\n", flush=True)
 
-    # first pass: sample THIS run's params + build every candidate's return series
-    # (the param draw is what makes each click a different batch of strategies)
-    series, books, order, used = {}, {}, [], {}
-    for spec in LAB_AGENTS:
+    # assemble this run's batch (LLM-invented first, then param-search fill)
+    batch = _build_batch(rng, use_llm, n=12)
+    n_llm = sum(1 for s in batch if s["source"] == "llm")
+    print(f"batch ready | {n_llm} LLM-invented + {len(batch) - n_llm} param-search\n", flush=True)
+
+    # first pass: build every candidate's return series (needed for the deflation set)
+    order = []
+    for spec in batch:
         name, agent = spec["strategy"], spec["agent"]
-        params = sample_params(name, rng)
-        used[name] = params
         try:
-            res = candidate_series(name, params)
+            res = candidate_series(spec["fn"], spec["params"], name)
         except Exception as e:
-            _say("build", agent, f"FAILED to compile {name}: {e}")
+            _say("build", agent, f"FAILED to compile {name}: {str(e)[:60]}")
             continue
         if res is None:
             _say("build", agent, f"no data for {name}")
             continue
-        r, b = res
-        series[name], books[name] = r, b
+        spec["_series"], spec["_book"] = res
         order.append(spec)
 
     # deflation set: variance of per-period Sharpes across all trials searched
-    per = {n: sharpe_stats(series[n].to_numpy()) for n in series}
-    sr_var = float(np.var([per[n]["sr"] for n in per], ddof=1)) if len(per) > 1 else 0.0
+    per = {s["strategy"]: sharpe_stats(s["_series"].to_numpy()) for s in order}
+    sr_var = float(np.var([v["sr"] for v in per.values()], ddof=1)) if len(per) > 1 else 0.0
     sr_star = expected_max_sharpe(len(per), sr_var)      # the deflation hurdle
 
     results = []
     for i, spec in enumerate(order, 1):
-        name, agent = spec["strategy"], spec["agent"]
-        r, b = series[name], books[name]
-        print(f"\n[{i}/{len(order)}] {agent} | {name} ({spec['family']})", flush=True)
+        name, agent, params = spec["strategy"], spec["agent"], spec["params"]
+        r = spec["_series"]
+        tag = "LLM-invented" if spec["source"] == "llm" else "param-search"
+        print(f"\n[{i}/{len(order)}] {agent} | {name} ({spec['family']}, {tag})", flush=True)
 
         # ---- research --------------------------------------------------------
         _say("research", agent, f"hypothesis: {spec['thesis']}")
 
         # ---- build -----------------------------------------------------------
-        params = used[name]
-        _say("build", agent, f"compiled signal | params {params} | long/flat | "
-                             f"shift=1 (no look-ahead) | {len(r)} bars")
+        _say("build", agent, f"compiled signal | {spec['source']} | params {params} | "
+                             f"long/flat | shift=1 (no look-ahead) | {len(r)} bars")
 
         # ---- validate --------------------------------------------------------
         common = ens.index.intersection(r.index)
@@ -168,7 +219,7 @@ def run(emit_path=None, seed=None):
 
         # ---- execute (DRY-RUN) ----------------------------------------------
         try:
-            target = float(LAB_STRATEGIES[name](daily_bars("SPY"), params).iloc[-1])
+            target = float(spec["fn"](daily_bars("SPY"), params).iloc[-1])
         except Exception:
             target = 0.0
         sleeve_usd = NOMINAL_BOOK * SLEEVE_W
@@ -182,7 +233,8 @@ def run(emit_path=None, seed=None):
 
         results.append({
             "agent": agent, "strategy": name, "family": spec["family"],
-            "thesis": spec["thesis"], "params": params,
+            "thesis": spec["thesis"], "params": params, "source": spec["source"],
+            "code": spec.get("code", ""),
             "sharpe": round(sh, 3), "maxdd": round(dd, 4), "corr": round(corr, 3),
             "blend": round(bsh, 3), "delta": round(delta, 4),
             "wf_pos": wf_pos, "wf_n": len(folds), "wf_folds": fold_srs,
@@ -210,7 +262,7 @@ def run(emit_path=None, seed=None):
 
     payload = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "seed": seed,
+        "seed": seed, "mode": "llm" if use_llm else "param-search", "n_llm": n_llm,
         "benchmark": {"sharpe": round(ens_sh, 3), "cagr": round(em["cagr"], 4),
                       "maxdd": round(em["max_drawdown"], 4)},
         "sr_star_annual": round(sr_star * np.sqrt(TRADING_DAYS), 3),
@@ -229,8 +281,10 @@ def main():
     ap.add_argument("--emit", default=None, help="write candidates JSON to this path")
     ap.add_argument("--seed", default=None, type=int,
                     help="fix the batch seed (default: time-based -> a new batch each run)")
+    ap.add_argument("--llm", action="store_true",
+                    help="invent new mechanisms via the LLM (falls back to param-search)")
     args = ap.parse_args()
-    run(emit_path=args.emit, seed=args.seed)
+    run(emit_path=args.emit, seed=args.seed, use_llm=args.llm)
 
 
 if __name__ == "__main__":

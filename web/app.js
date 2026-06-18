@@ -325,7 +325,7 @@ function renderCandidates(data){
       const up=c.delta>=0, lc=c.corr<0.5;
       return `<div class="cand ${d}" data-strat="${esc2(c.strategy)}" style="--fc:${FAMC[c.family]||'var(--dim2)'}">
         <div class="cand-head">
-          <div><div class="cand-agent">${esc2(c.agent)}</div><div class="cand-strat">${esc2(c.strategy)}</div></div>
+          <div><div class="cand-agent">${esc2(c.agent)}</div><div class="cand-strat">${esc2(c.strategy)}${c.source?`<span class="src-badge ${c.source}">${c.source==='llm'?'LLM-invented':'param-search'}</span>`:''}</div></div>
           <span class="vpill ${vc}">${c.verdict}</span></div>
         <div class="cand-thesis">${esc2(c.thesis)}</div>
         ${c.params?`<div class="cand-params">${esc2(Object.entries(c.params).map(([k,v])=>k+' '+v).join(' · '))}</div>`:''}
