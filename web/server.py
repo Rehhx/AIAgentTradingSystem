@@ -51,8 +51,21 @@ PIPELINE = [
               "--crypto-sleeve", "--park-market", "SPY"], "timeout": 360},
 ]
 
-# hard guard: refuse to run if anyone ever sneaks --live into a step
-assert not any("--live" in s["argv"] for s in PIPELINE), "live execution is not allowed from the web backend"
+# The 12-AGENT LAB pipeline: one step that runs the autonomous research desk —
+# each agent researches an ORIGINAL mechanism, then build/validate/execute, and
+# the candidates are written to web/candidates.json for human approval.
+AGENT_PIPELINE = [
+    {"phase": "agents", "label": "12 agents | research -> build -> validate -> execute",
+     "argv": [PY, "-u", "runners/agent_lab.py", "--emit", "web/candidates.json"],
+     "timeout": 600},
+]
+
+# hard guard: refuse to run if anyone ever sneaks --live into ANY step
+assert not any("--live" in s["argv"] for s in PIPELINE + AGENT_PIPELINE), \
+    "live execution is not allowed from the web backend"
+
+CANDIDATES = WEB / "candidates.json"
+DECISIONS = WEB / "decisions.json"
 
 RUN = {"id": 0, "lines": [], "phase": None, "status": "idle"}
 LOCK = threading.Lock()
@@ -114,6 +127,10 @@ def _classify(t: str) -> str:
     s = t.lower()
     if any(k in s for k in ("error", "traceback", "exception", "failed")):
         return "err"
+    if "promote" in s:
+        return "ok"
+    if "review" in s or "reject" in s:
+        return "warn"
     if any(k in s for k in ("awaiting", "dry-run", "no orders", "warn", "timed out", "gate")):
         return "warn"
     if any(k in s for k in ("pass", " ok", "✓", "deflated", "5/5", "beats", "order(s)", "sharpe")):
@@ -127,9 +144,35 @@ def _add(phase, text, cls=""):
                              "ts": time.strftime("%H:%M:%S")})
 
 
-def _run_pipeline(rid):
+# --- human approval ledger (records decisions; it does NOT trade) ------------
+_DEC_LOCK = threading.Lock()
+
+
+def _load_decisions():
+    if DECISIONS.is_file():
+        try:
+            return json.loads(DECISIONS.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def _record_decision(strategy, decision):
+    """persist a human approve/reject for a candidate. Approved candidates are
+    only MARKED for promotion — going live still needs the deliberate --live
+    command run by a human, never this server."""
+    if decision not in ("approved", "rejected", "pending"):
+        return None
+    with _DEC_LOCK:
+        d = _load_decisions()
+        d[strategy] = {"decision": decision, "ts": time.strftime("%Y-%m-%d %H:%M:%S")}
+        DECISIONS.write_text(json.dumps(d, indent=2), encoding="utf-8")
+    return d[strategy]
+
+
+def _run_pipeline(rid, pipeline):
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
-    for step in PIPELINE:
+    for step in pipeline:
         if RUN["id"] != rid:
             return
         with LOCK:
@@ -154,7 +197,10 @@ def _run_pipeline(rid):
             p.wait()
         except Exception as e:
             _add(step["phase"], f"step error: {e}", "err")
-    _add("execute", "⏸ AWAITING HUMAN AUTHORIZATION — dry-run only, no order sent to the broker", "warn")
+    if pipeline is AGENT_PIPELINE:
+        _add("agents", "⏸ AWAITING HUMAN DECISION — approve or reject each candidate below (no order sent)", "warn")
+    else:
+        _add("execute", "⏸ AWAITING HUMAN AUTHORIZATION — dry-run only, no order sent to the broker", "warn")
     with LOCK:
         RUN["status"] = "done"
         RUN["phase"] = None
@@ -182,6 +228,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps({"ok": True}))
         if u.path == "/api/account":
             return self._send(200, json.dumps(_account_snapshot()))
+        if u.path == "/api/candidates":
+            data = (json.loads(CANDIDATES.read_text(encoding="utf-8"))
+                    if CANDIDATES.is_file() else {"candidates": []})
+            data["decisions"] = _load_decisions()
+            return self._send(200, json.dumps(data))
         if u.path == "/api/log":
             since = int((parse_qs(u.query).get("since", ["0"])[0]) or 0)
             with LOCK:
@@ -193,13 +244,23 @@ class Handler(BaseHTTPRequestHandler):
         f = (WEB / rel).resolve()
         if not str(f).startswith(str(WEB)) or not f.is_file():
             return self._send(404, "not found", "text/plain")
-        ctype = {"html": "text/html; charset=utf-8", "css": "text/css",
-                 "js": "application/javascript", "svg": "image/svg+xml",
+        ctype = {"html": "text/html; charset=utf-8", "css": "text/css; charset=utf-8",
+                 "js": "application/javascript; charset=utf-8", "svg": "image/svg+xml",
                  "png": "image/png", "json": "application/json"}.get(f.suffix.lstrip("."), "text/plain")
         self._send(200, f.read_bytes(), ctype)
 
+    def _body(self):
+        try:
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            return json.loads(self.rfile.read(n) or b"{}") if n else {}
+        except Exception:
+            return {}
+
     def do_POST(self):
-        if urlparse(self.path).path == "/api/run":
+        path = urlparse(self.path).path
+        if path == "/api/run":
+            body = self._body()
+            pipeline = AGENT_PIPELINE if body.get("mode") == "agents" else PIPELINE
             with LOCK:
                 if RUN["status"] == "running":
                     return self._send(409, json.dumps({"error": "already running"}))
@@ -208,8 +269,15 @@ class Handler(BaseHTTPRequestHandler):
                 RUN["status"] = "running"
                 RUN["phase"] = None
                 rid = RUN["id"]
-            threading.Thread(target=_run_pipeline, args=(rid,), daemon=True).start()
-            return self._send(200, json.dumps({"id": rid}))
+            threading.Thread(target=_run_pipeline, args=(rid, pipeline),
+                             daemon=True).start()
+            return self._send(200, json.dumps({"id": rid, "mode": body.get("mode", "deploy")}))
+        if path == "/api/decide":
+            body = self._body()
+            rec = _record_decision(body.get("strategy", ""), body.get("decision", ""))
+            if rec is None:
+                return self._send(400, json.dumps({"error": "bad decision"}))
+            return self._send(200, json.dumps({"ok": True, "record": rec}))
         self._send(404, json.dumps({"error": "not found"}))
 
 

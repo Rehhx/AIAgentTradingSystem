@@ -25,5 +25,8 @@ vector_stores/chroma_db/
 results/
 logs/
 
+# runtime human-approval ledger written by the web cockpit (local state, not source)
+web/decisions.json
+
 # local agent working memory (not part of the public repo)
 memory/

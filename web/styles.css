@@ -244,3 +244,58 @@ canvas{display:block}
   .roster{grid-template-columns:repeat(2,1fr)}:root{--rail:64px}
   .brand-txt,.nav-item span,.rail-foot{display:none}
 }
+
+/* ---- strategy lab (agents view) ---- */
+.agent-actions{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.agent-actions .ghost-btn{margin-top:0}
+.primary-btn{background:linear-gradient(135deg,rgba(47,230,166,.16),rgba(47,230,166,.04));
+  border:1px solid rgba(47,230,166,.4);color:var(--up);font-family:var(--mono);font-size:12.5px;
+  letter-spacing:.05em;padding:10px 18px;border-radius:10px;cursor:pointer;transition:.2s}
+.primary-btn .pb-ico{margin-right:6px;display:inline-block}
+.primary-btn:hover{background:linear-gradient(135deg,rgba(47,230,166,.26),rgba(47,230,166,.08));box-shadow:0 0 26px -4px var(--glow)}
+.primary-btn:active{transform:scale(.97)}
+.primary-btn:disabled,.primary-btn.busy{opacity:.6;cursor:default;box-shadow:none}
+.primary-btn.busy .pb-ico{animation:spin 1s linear infinite}
+
+.lab-panel{margin-top:18px}
+.agent-log{height:206px;overflow-y:auto;font-size:11.5px;line-height:1.7;background:var(--bg2);
+  border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:4px 0 16px;
+  scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.agent-log::-webkit-scrollbar{width:7px}.agent-log::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+.aln{display:flex;gap:9px;align-items:baseline;opacity:0;animation:logln .22s forwards}
+.aln .ats{color:var(--faint);flex:none;font-size:10px;min-width:58px}
+.aln .aph{flex:none;min-width:62px;color:var(--c,var(--dim2));text-transform:uppercase;font-size:9.5px;letter-spacing:.08em}
+.aln .ok{color:var(--up)}.aln .warn{color:var(--bench)}.aln .err{color:var(--down)}
+
+.lab-summary{grid-column:1/-1;font-size:11.5px;color:var(--dim);border:1px dashed var(--line2);
+  border-radius:10px;padding:10px 13px;margin-bottom:4px;background:rgba(70,200,255,.03)}
+.cand-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cand{position:relative;border:1px solid var(--line);border-left:3px solid var(--fc);border-radius:13px;
+  padding:14px;background:linear-gradient(165deg,var(--panel2),var(--panel));transition:.2s;
+  display:flex;flex-direction:column;gap:9px}
+.cand:hover{border-color:var(--line2);transform:translateY(-2px);box-shadow:0 10px 30px -16px #000}
+.cand.approved{border-color:rgba(47,230,166,.5);box-shadow:0 0 0 1px rgba(47,230,166,.25)}
+.cand.rejected{opacity:.5}
+.cand-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.cand-agent{font-family:var(--disp);font-weight:800;font-size:15px;letter-spacing:.01em}
+.cand-strat{font-size:10px;color:var(--dim2);margin-top:2px}
+.vpill{font-size:9px;letter-spacing:.1em;padding:3px 8px;border-radius:20px;border:1px solid;flex:none}
+.vpill.up{color:var(--up);border-color:rgba(47,230,166,.4);background:rgba(47,230,166,.07)}
+.vpill.amber{color:var(--bench);border-color:rgba(245,168,59,.35);background:rgba(245,168,59,.06)}
+.vpill.down{color:var(--down);border-color:rgba(255,93,115,.3);background:rgba(255,93,115,.05)}
+.cand-thesis{font-size:11px;color:var(--dim);line-height:1.45;min-height:32px}
+.cand-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 6px;padding:9px 0;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.cand-metrics div{display:flex;flex-direction:column;gap:2px}
+.cand-metrics span{font-size:8.5px;letter-spacing:.08em;color:var(--dim2)}
+.cand-metrics b{font-size:13px;font-variant-numeric:tabular-nums;font-weight:700}
+.cand-foot{display:flex;align-items:center;gap:8px}
+.cand-foot button{font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:8px;cursor:pointer;border:1px solid;transition:.18s}
+.cand-foot .appr{color:var(--up);border-color:rgba(47,230,166,.35);background:rgba(47,230,166,.06)}
+.cand-foot .appr:hover{background:rgba(47,230,166,.16)}
+.cand-foot .rej{color:var(--down);border-color:rgba(255,93,115,.3);background:rgba(255,93,115,.05)}
+.cand-foot .rej:hover{background:rgba(255,93,115,.14)}
+.cand-state{margin-left:auto;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2)}
+.cand.approved .cand-state{color:var(--up)}.cand.rejected .cand-state{color:var(--down)}
+@media(max-width:1100px){.cand-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:680px){.cand-grid{grid-template-columns:1fr}}

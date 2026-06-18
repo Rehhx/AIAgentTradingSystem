@@ -113,8 +113,12 @@
   <main class="view" id="view-agents">
     <div class="view-head">
       <h1 class="title"><span class="t-dim">12 agents,</span> one pipeline</h1>
-      <p class="sub">Research → build → validate → execute. Watch the desk check the market in real time.</p>
-      <button class="ghost-btn" id="checkMarket">⟳ check the market</button>
+      <p class="sub">Each agent researches an <b>original</b> mechanism — no textbook references — then builds, validates and dry-run-executes it. You approve or reject what survives.</p>
+      <div class="agent-actions">
+        <button class="primary-btn" id="runAgents"><span class="pb-ico">▶</span> run 12 agents</button>
+        <button class="ghost-btn" id="checkMarket">⟳ check the market</button>
+        <span class="tag" id="agentsState">idle</span>
+      </div>
     </div>
     <section class="field-panel">
       <canvas id="field"></canvas>
@@ -125,6 +129,16 @@
         <span style="--c:var(--up)">EXECUTE</span>
       </div>
     </section>
+
+    <section class="panel lab-panel">
+      <div class="panel-head">
+        <h3>Strategy lab · candidates</h3>
+        <span class="tag" id="benchLine">benchmark — equity ensemble</span>
+      </div>
+      <div class="agent-log" id="agentLog" hidden></div>
+      <div class="cand-grid" id="candGrid"></div>
+    </section>
+
     <section class="roster" id="roster"></section>
   </main>
 

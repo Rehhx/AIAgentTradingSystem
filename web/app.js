@@ -43,6 +43,14 @@ const DATA = {
 const LAYERS = [["research","var(--cyan)","RESEARCH"],["build","var(--violet)","BUILD"],
                 ["validate","var(--bench)","VALIDATE"],["execute","var(--up)","EXECUTE"]];
 const COL = {research:"#46c8ff",build:"#9d8bff",validate:"#f5a83b",execute:"#2fe6a6"};
+const FAMC = {reversion:"var(--cyan)",trend:"var(--up)",volatility:"var(--bench)",structure:"var(--violet)"};
+
+/* offline fallback: a real snapshot of runners/agent_lab.py --emit web/candidates.json
+   (used when the page is opened from file:// with no backend). With the backend up
+   the cockpit fetches the LIVE /api/candidates instead. */
+const DEMO_BENCH={"sharpe":1.591,"cagr":0.1051,"maxdd":-0.0775};
+const DEMO_SRSTAR=0.674;
+const DEMO_CANDS=[{"agent":"gravity","strategy":"mean_gravity","family":"reversion","thesis":"stretch below a long anchor in ATR units mean-reverts to the anchor","sharpe":0.785,"maxdd":-0.0371,"corr":0.217,"blend":1.612,"delta":0.0216,"wf_pos":5,"wf_n":5,"dsr":0.6415,"verdict":"REVIEW","reason":"improves the blend but DSR 64%"},{"agent":"regime-dial","strategy":"vol_regime_switch","family":"volatility","thesis":"size inversely to the volatility percentile - full when calm, flat when stormy","sharpe":1.366,"maxdd":-0.0557,"corr":0.808,"blend":1.597,"delta":0.006,"wf_pos":5,"wf_n":5,"dsr":0.9852,"verdict":"REVIEW","reason":"improves the blend but corr too high"},{"agent":"breadth-int","strategy":"breadth_thrust_self","family":"trend","thesis":"a name's own internal breadth thrust signals broad-based ignition","sharpe":0.0,"maxdd":0.0,"corr":0.0,"blend":1.591,"delta":-0.0,"wf_pos":0,"wf_n":5,"dsr":0.015,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"ladder-keeper","strategy":"drawdown_ladder","family":"reversion","thesis":"accumulate deeper-into-the-dip in a secular uptrend, scale out on recovery","sharpe":0.893,"maxdd":-0.0934,"corr":0.574,"blend":1.582,"delta":-0.009,"wf_pos":5,"wf_n":5,"dsr":0.7596,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"coil-scout","strategy":"coil_release","family":"volatility","thesis":"compressed ranges store energy that releases upward - trade the transition","sharpe":1.14,"maxdd":-0.1632,"corr":0.761,"blend":1.57,"delta":-0.0205,"wf_pos":5,"wf_n":5,"dsr":0.9283,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"nightfade","strategy":"gap_fade_revert","family":"reversion","thesis":"panic gap-down opens in an uptrend overshoot and snap back","sharpe":0.432,"maxdd":-0.0683,"corr":0.395,"blend":1.568,"delta":-0.0229,"wf_pos":3,"wf_n":5,"dsr":0.227,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"two-clocks","strategy":"dual_horizon_agree","family":"structure","thesis":"act only when a slow uptrend and a fast turn-up agree","sharpe":0.668,"maxdd":-0.0877,"corr":0.489,"blend":1.561,"delta":-0.03,"wf_pos":5,"wf_n":5,"dsr":0.492,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"pathwise","strategy":"trend_persistence","family":"trend","thesis":"the smoothness of a climb, not its slope, predicts continuation","sharpe":0.673,"maxdd":-0.0636,"corr":0.601,"blend":1.557,"delta":-0.0334,"wf_pos":5,"wf_n":5,"dsr":0.4984,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"streakwatch","strategy":"streak_reversal","family":"reversion","thesis":"rare consecutive down-streaks in an uptrend are short-term overreactions","sharpe":0.326,"maxdd":-0.0673,"corr":0.432,"blend":1.555,"delta":-0.0354,"wf_pos":4,"wf_n":5,"dsr":0.1331,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"straightline","strategy":"slope_quality","family":"trend","thesis":"grade exposure by the R-squared of the up-trend - buy clean, refuse ragged","sharpe":0.635,"maxdd":-0.0671,"corr":0.681,"blend":1.548,"delta":-0.043,"wf_pos":5,"wf_n":5,"dsr":0.451,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"inflection","strategy":"velocity_flip","family":"trend","thesis":"price acceleration turns before the trend cross - buy the inflection","sharpe":0.963,"maxdd":-0.0974,"corr":0.75,"blend":1.542,"delta":-0.0487,"wf_pos":5,"wf_n":5,"dsr":0.8189,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"ignition","strategy":"expansion_breakout","family":"volatility","thesis":"a true-range blow-out closing strong ignites a multi-day move","sharpe":0.101,"maxdd":-0.1355,"corr":0.466,"blend":1.522,"delta":-0.0682,"wf_pos":2,"wf_n":5,"dsr":0.0337,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"}];
 
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
@@ -55,7 +63,7 @@ function activateView(v){
   $$(".view").forEach(x=>x.classList.remove("is-active"));
   $("#view-"+v).classList.add("is-active");
   if(v==="dashboard"){drawEquity();countUp();pollAccount();}
-  if(v==="agents"){startField();} else if(fieldStop){fieldStop();fieldStop=null;}
+  if(v==="agents"){startField();loadCandidates();} else if(fieldStop){fieldStop();fieldStop=null;}
   if(location.hash.slice(1)!==v)history.replaceState(null,"","#"+v);
 }
 $$(".nav-item").forEach(b=>b.addEventListener("click",()=>activateView(b.dataset.view)));
@@ -239,9 +247,13 @@ function startField(){
     $$(".agent").forEach((a,i)=>setTimeout(()=>{a.classList.add("firing");
       setTimeout(()=>a.classList.remove("firing"),650);},i*45));};
   cm.onclick=handler;
+  // let the lab pipeline flash a whole layer as each phase fires
+  window.__pulseLayer=(key)=>{const li=LAYERS.findIndex(L=>L[0]===key);if(li<0)return;
+    for(let r=0;r<3;r++){const nn=nodes[li*3+r];if(nn)nn.flash=1;}
+    if(li<3)spawn(2);};
   // periodic auto-check
   const iv=setInterval(handler,9000);setTimeout(handler,600);
-  fieldStop=()=>{cancelAnimationFrame(raf);clearInterval(iv);};
+  fieldStop=()=>{cancelAnimationFrame(raf);clearInterval(iv);window.__pulseLayer=null;};
 }
 function renderRoster(){
   $("#roster").innerHTML=LAYERS.map(([key,col,label])=>`
@@ -251,6 +263,105 @@ function renderRoster(){
         <div class="agent ready" style="--cl:${col}">
           <span class="ad"></span><div><div class="an">${n}</div><div class="ar">${r}</div></div></div>`).join("")}
     </div>`).join("");
+}
+
+/* ---------------- strategy lab (12 agents → candidates → approve/reject) ---------------- */
+const esc2=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function agentLine(L){
+  const log=$("#agentLog");if(!log)return;
+  const tok=((L.text||"").split(" | ")[0]||"").trim();
+  const known=["research","build","validate","execute","verdict"].includes(tok);
+  const lk=tok==="verdict"?"execute":tok;
+  const rest=known?L.text.slice(L.text.indexOf("|")+1):L.text;
+  const ln=document.createElement("div");ln.className="aln";
+  ln.innerHTML=`<span class="ats">${L.ts||""}</span>`+
+    (known?`<span class="aph" style="--c:${COL[lk]}">${tok}</span>`:`<span class="aph dim"></span>`)+
+    `<span class="${L.cls||''}">${esc2(rest)}</span>`;
+  log.appendChild(ln);log.scrollTop=log.scrollHeight;
+  if(known&&window.__pulseLayer)window.__pulseLayer(lk);
+}
+function finishAgents(){
+  running=false;const b=$("#runAgents");if(b){b.disabled=false;b.classList.remove("busy");}
+  const s=$("#agentsState");if(s){s.textContent="complete · your decision";s.className="tag up";}
+}
+function renderCandidates(data){
+  const bm=data.benchmark||DEMO_BENCH,dec=data.decisions||{};
+  $("#benchLine").textContent=`benchmark — equity ensemble · Sharpe ${bm.sharpe.toFixed(2)} · the bar to clear`;
+  const cands=(data.candidates||[]).slice().sort((a,b)=>b.delta-a.delta);
+  const n=cands.length, imp=cands.filter(c=>c.delta>0).length;
+  $("#candGrid").innerHTML=
+    `<div class="lab-summary">${n} original mechanisms tested · <b class="up">${imp}</b> raise the blended Sharpe ·
+      <b class="amber">${cands.filter(c=>c.verdict==='REVIEW').length}</b> for review ·
+      deflation hurdle SR* ${(data.sr_star_annual||DEMO_SRSTAR).toFixed(2)} (corrected for ${n} trials)</div>`+
+    cands.map(c=>{
+      const vc=c.verdict==="PROMOTE"?"up":c.verdict==="REVIEW"?"amber":"down";
+      const d=dec[c.strategy]?dec[c.strategy].decision:"pending";
+      const up=c.delta>=0, lc=c.corr<0.5;
+      return `<div class="cand ${d}" data-strat="${esc2(c.strategy)}" style="--fc:${FAMC[c.family]||'var(--dim2)'}">
+        <div class="cand-head">
+          <div><div class="cand-agent">${esc2(c.agent)}</div><div class="cand-strat">${esc2(c.strategy)}</div></div>
+          <span class="vpill ${vc}">${c.verdict}</span></div>
+        <div class="cand-thesis">${esc2(c.thesis)}</div>
+        <div class="cand-metrics">
+          <div><span>SHARPE</span><b>${c.sharpe.toFixed(2)}</b></div>
+          <div><span>CORR</span><b class="${lc?'up':''}">${c.corr>=0?'+':''}${c.corr.toFixed(2)}</b></div>
+          <div><span>BLEND Δ</span><b class="${up?'up':'down'}">${up?'+':''}${c.delta.toFixed(2)}</b></div>
+          <div><span>WF</span><b>${c.wf_pos}/${c.wf_n}</b></div>
+          <div><span>DSR</span><b>${Math.round(c.dsr*100)}%</b></div>
+          <div><span>MAX DD</span><b class="down">${(c.maxdd*100).toFixed(1)}%</b></div>
+        </div>
+        <div class="cand-foot">
+          <button class="appr" data-d="approved">✓ approve</button>
+          <button class="rej" data-d="rejected">✕ reject</button>
+          <span class="cand-state">${d!=='pending'?d:''}</span>
+        </div></div>`;
+    }).join("");
+  $$("#candGrid .cand").forEach(card=>card.querySelectorAll("button").forEach(
+    btn=>btn.addEventListener("click",()=>decide(card.dataset.strat,btn.dataset.d,card))));
+}
+function decide(strategy,decision,card){
+  const apply=()=>{card.classList.remove("approved","rejected","pending");card.classList.add(decision);
+    card.querySelector(".cand-state").textContent=decision;};
+  if(!BACKEND){apply();return;}
+  fetch("/api/decide",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({strategy,decision})}).then(r=>r.json()).then(apply).catch(apply);
+}
+function loadCandidates(){
+  if(!BACKEND){if(!$("#candGrid").children.length)
+    renderCandidates({benchmark:DEMO_BENCH,sr_star_annual:DEMO_SRSTAR,candidates:DEMO_CANDS,decisions:{}});return;}
+  fetch("/api/candidates").then(r=>r.json()).then(d=>{
+    if(d&&d.candidates&&d.candidates.length)renderCandidates(d);
+  }).catch(()=>{});
+}
+function simAgents(){
+  let i=0;const script=DEMO_CANDS.flatMap(c=>[
+    `research | ${c.agent} | hypothesis: ${c.thesis}`,
+    `build | ${c.agent} | compiled signal | long/flat | shift=1 (no look-ahead)`,
+    `validate | ${c.agent} | Sharpe ${c.sharpe.toFixed(2)} | corr->ens ${c.corr>=0?'+':''}${c.corr.toFixed(2)} | blend ${c.blend.toFixed(2)} (${c.delta>=0?'+':''}${c.delta.toFixed(2)}) | WF ${c.wf_pos}/5 | DSR ${Math.round(c.dsr*100)}%`,
+    `verdict | ${c.agent} | ${c.verdict} - ${c.reason}`]);
+  (function next(){
+    if(i>=script.length){agentLine({ts:"",text:"⏸ AWAITING HUMAN DECISION — approve or reject below",cls:"warn"});
+      finishAgents();renderCandidates({benchmark:DEMO_BENCH,sr_star_annual:DEMO_SRSTAR,candidates:DEMO_CANDS,decisions:{}});return;}
+    agentLine({ts:new Date().toLocaleTimeString("en-US",{hour12:false}),text:script[i],cls:""});
+    i++;setTimeout(next,90+Math.random()*110);
+  })();
+}
+function runAgents(){
+  if(running)return;running=true;
+  const b=$("#runAgents");if(b){b.disabled=true;b.classList.add("busy");}
+  const s=$("#agentsState");s.textContent="running…";s.className="tag amber";
+  const log=$("#agentLog");log.hidden=false;log.innerHTML="";$("#candGrid").innerHTML="";
+  if(!BACKEND){simAgents();return;}
+  fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"agents"})})
+    .then(r=>r.json()).then(()=>{
+      let since=0;
+      const poll=()=>fetch("/api/log?since="+since).then(r=>r.json()).then(d=>{
+        d.lines.forEach(L=>{since++;agentLine(L);});
+        if(d.status==="done"){finishAgents();loadCandidates();}
+        else setTimeout(poll,300);
+      }).catch(()=>{agentLine({ts:"",text:"[backend connection lost]",cls:"err"});finishAgents();});
+      poll();
+    }).catch(()=>{BACKEND=false;simAgents();});
 }
 
 /* ---------------- control / orchestration ---------------- */
@@ -322,6 +433,7 @@ function simulateRun(){
   })();
 }
 $("#power").addEventListener("click",orchestrate);
+$("#runAgents")&&$("#runAgents").addEventListener("click",runAgents);
 // detect the backend; if present the Control page runs the REAL pipeline
 fetch("/api/health").then(r=>r.ok?r.json():null).then(j=>{
   if(j&&j.ok){BACKEND=true;$("#logState").textContent="backend live";$("#logState").classList.add("up");

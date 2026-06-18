@@ -79,6 +79,37 @@ than tune to a green number.
 
 ---
 
+## The autonomous strategy lab — 12 agents ⭐
+
+A self-contained research desk that invents and vets **original** strategies, then asks a
+human to approve or reject what survives. Launchable in one click from the web cockpit's
+**AI Agents** tab, or headless via `python runners/agent_lab.py`.
+
+* **`agents/lab_strategies.py` — 12 in-house mechanisms, no public references.** Volatility
+  *coil release*, a graded *drawdown ladder*, price *acceleration flip*, *path persistence*,
+  a *volatility-regime allocator*, *overnight gap-down fade*, *internal breadth thrust*,
+  *ATR-stretch gravity*, *down-streak overreaction*, *range-expansion ignition*, *trend
+  R²-quality*, and *dual-horizon agreement* — each a first-principles construction with its
+  own distinct parameter set (not a re-skinned RSI/Bollinger).
+* **`runners/agent_lab.py` — the loop.** Each agent runs **research → build → validate →
+  execute (dry-run)**. The bar is **our equity ensemble (Sharpe ≈ 1.59), not buy-&-hold
+  SPY**: a candidate wins by *raising the blended Sharpe* (decorrelation), measured as the
+  marginal contribution of a 15% sleeve, then stress-tested with walk-forward folds and a
+  **deflated Sharpe corrected for searching 12 trials**. Every candidate gets a
+  PROMOTE / REVIEW / REJECT recommendation written to `web/candidates.json`.
+* **Human-in-the-loop.** The cockpit renders each candidate as a card with its metrics and a
+  ✓ approve / ✕ reject button (`/api/decide` → `web/decisions.json`). **The machine proposes;
+  the human disposes** — nothing here ever places a live order.
+
+**Honest result (latest run):** of 12 original mechanisms, **2 raise the blended Sharpe** —
+`mean_gravity` (corr **+0.22**, blend **1.61**, 5/5 folds) is a genuine low-correlation
+diversifier in the spirit of the capitulation sleeve, and `vol_regime_switch` (DSR **99%**)
+helps but is too correlated (0.81) to add much. The other 10 are honest rejects: the
+ensemble already owns those return shapes — consistent with the **diversification ceiling**.
+The lever remains *decorrelation*, not another high-Sharpe long-equity sleeve.
+
+---
+
 ## The deployable book + today's fix
 
 The live Account-1 book (`run_rebalance.ps1`):
@@ -128,8 +159,18 @@ python runners\rigor_report.py          # Deflated Sharpe, PBO, Reality-Check/SP
 python runners\bt_parity.py             # event-engine vs vectorized parity
 python runners\market_park_backtest.py  # market-park + sentinel vs buy-hold SPY
 python runners\account_vs_spy.py --account 1   # live account vs SPY (since inception)
+python runners\agent_lab.py             # the 12-agent strategy lab (research->...->execute)
 pytest tests/                           # 63 tests
 ```
+
+### Run the cockpit (web UI + live backend)
+```powershell
+python web\server.py                    # http://127.0.0.1:8787  (Ctrl+C to stop)
+```
+Opens the dashboard, the animated **AI Agents** desk (one click runs the real 12-agent lab
+and streams it live, then you approve/reject each candidate), and the **Control** page
+(runs the real research→build→validate→deploy pipeline, gated before any live order).
+Opening `web/index.html` directly still works as an offline demo.
 
 ### Paper-trade (dry-run first, then --live)
 ```powershell
