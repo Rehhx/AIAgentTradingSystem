@@ -245,6 +245,19 @@ canvas{display:block}
   .brand-txt,.nav-item span,.rail-foot{display:none}
 }
 
+/* ---- book of strategies (dashboard) ---- */
+.book-list{margin-top:12px;display:flex;flex-direction:column;gap:5px}
+.bk-row{display:flex;align-items:center;gap:10px;padding:8px 11px;border:1px solid var(--line);
+  border-left:3px solid var(--fc);border-radius:9px;background:var(--bg2);font-size:11.5px}
+.bk-row.lab{background:linear-gradient(90deg,rgba(47,230,166,.06),var(--bg2))}
+.bk-dot{width:6px;height:6px;border-radius:50%;background:var(--fc);box-shadow:0 0 8px var(--fc);flex:none}
+.bk-name{flex:1;color:var(--text)}
+.bk-name span{display:block;font-size:9px;color:var(--dim2);margin-top:1px}
+.bk-src{font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2)}
+.bk-row.lab .bk-src{color:var(--up)}
+.bk-w{font-variant-numeric:tabular-nums;min-width:42px;text-align:right;color:var(--text)}
+.bk-overlay{font-size:10px;color:var(--dim2);padding:7px 11px;border:1px dashed var(--line2);border-radius:9px;margin-top:2px}
+
 /* ---- strategy lab (agents view) ---- */
 .agent-actions{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
 .agent-actions .ghost-btn{margin-top:0}

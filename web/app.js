@@ -21,10 +21,18 @@ const DATA = {
     {l:"Overnight edge · net Sharpe",   v:"0.65",  w:"65%", good:1, n:"½ drawdown · DSR 99% · 5/5 WF"},
   ],
   books: [
-    {n:"Market + sentinel", note:"idle→market, de-risk on VIX brake", s:0.97, c:13.6, dd:-22.8, tag:"ok"},
-    {n:"Equity ensemble", note:"7 sleeves · no-margin · crash sentinel", s:1.59, c:10.5, dd:-7.8, tag:"ok"},
-    {n:"Buy & hold SPY", note:"the benchmark we have to beat", s:0.82, c:13.9, dd:-33.7, tag:"bench"},
+    {n:"Equity ensemble", note:"no-margin · crash sentinel · the book we run", s:1.59, c:10.5, dd:-7.8, tag:"ok"},
   ],
+  // offline seed of web/book.json (the live registry when the backend is up)
+  book: {name:"Equity ensemble (no-margin, crash sentinel)", strategies:[
+    {name:"rsi2_meanrev",label:"RSI-2 mean reversion",weight:0.252,source:"core",family:"reversion"},
+    {name:"donchian",label:"Donchian breakout",weight:0.198,source:"core",family:"trend"},
+    {name:"recovery",label:"Recovery thrust (V-snapback)",weight:0.162,source:"core",family:"trend"},
+    {name:"trend_5020",label:"50/200 trend",weight:0.126,source:"core",family:"trend"},
+    {name:"lowvol_defensive",label:"Low-vol defensive",weight:0.10,source:"core",family:"structure"},
+    {name:"pead",label:"Post-earnings drift",weight:0.09,source:"core",family:"structure"},
+    {name:"xs_momentum",label:"Cross-sectional dual-momentum",weight:0.072,source:"core",family:"trend"}
+  ], overlay:"VIX crash sentinel — de-risk to 60% on early-warning or VIX backwardation"},
   agents: {
     research:[["research_agent","invents equity strategies, web + first-principles"],
               ["autonomous_agent","pure first-principles mechanism search"],
@@ -62,7 +70,7 @@ function activateView(v){
   $$(".nav-item").forEach(n=>n.classList.toggle("is-active",n.dataset.view===v));
   $$(".view").forEach(x=>x.classList.remove("is-active"));
   $("#view-"+v).classList.add("is-active");
-  if(v==="dashboard"){drawEquity();countUp();pollAccount();}
+  if(v==="dashboard"){drawEquity();countUp();pollAccount();loadBook();}
   if(v==="agents"){startField();loadCandidates();} else if(fieldStop){fieldStop();fieldStop=null;}
   if(location.hash.slice(1)!==v)history.replaceState(null,"","#"+v);
 }
@@ -119,6 +127,23 @@ function renderBooks(){
       <div class="stat-mini"><span>MAX DD</span><b class="${b.dd<-25?'down':'up'}">${b.dd.toFixed(1)}%</b></div>
       <span class="pill ${b.tag}">${b.tag==='ok'?'PASS':'BENCH'}</span>
     </div>`).join("");
+}
+function renderBook(book){
+  const el=$("#bookList");if(!el)return;
+  const ss=(book.strategies||[]).slice().sort((a,b)=>(b.weight||0)-(a.weight||0));
+  el.innerHTML=ss.map(s=>{
+    const w=(s.weight!=null&&s.weight>0)?(s.weight*100).toFixed(1)+"%":"new";
+    const lab=s.source==="lab";
+    return `<div class="bk-row${lab?' lab':''}" style="--fc:${FAMC[s.family]||'var(--dim2)'}">
+      <span class="bk-dot"></span>
+      <div class="bk-name">${s.label||s.name}<span>${s.name}</span></div>
+      <span class="bk-src">${lab?'lab · approved':'core'}</span>
+      <b class="bk-w">${w}</b></div>`;
+  }).join("")+(book.overlay?`<div class="bk-overlay">⛨ ${book.overlay}</div>`:"");
+}
+function loadBook(){
+  if(!BACKEND){renderBook(DATA.book);return;}
+  fetch("/api/book").then(r=>r.json()).then(b=>renderBook(b&&b.strategies?b:DATA.book)).catch(()=>renderBook(DATA.book));
 }
 function renderEdge(){
   $("#edge").innerHTML=`
@@ -306,7 +331,7 @@ function renderCandidates(data){
           <div><span>SHARPE</span><b>${c.sharpe.toFixed(2)}</b></div>
           <div><span>CORR</span><b class="${lc?'up':''}">${c.corr>=0?'+':''}${c.corr.toFixed(2)}</b></div>
           <div><span>BLEND Δ</span><b class="${up?'up':'down'}">${up?'+':''}${c.delta.toFixed(2)}</b></div>
-          <div><span>WF</span><b>${c.wf_pos}/${c.wf_n}</b></div>
+          <div title="${c.wf_folds?'walk-forward fold Sharpes: '+c.wf_folds.join(', '):'walk-forward folds'}"><span>WF</span><b>${c.wf_pos}/${c.wf_n}</b></div>
           <div><span>DSR</span><b>${Math.round(c.dsr*100)}%</b></div>
           <div><span>MAX DD</span><b class="down">${(c.maxdd*100).toFixed(1)}%</b></div>
         </div>
@@ -321,8 +346,15 @@ function renderCandidates(data){
 }
 function decide(strategy,decision,card){
   const apply=()=>{card.classList.remove("approved","rejected","pending");card.classList.add(decision);
-    card.querySelector(".cand-state").textContent=decision;};
-  if(!BACKEND){apply();return;}
+    card.querySelector(".cand-state").textContent=decision==="approved"?"✓ in book":decision;
+    loadBook();};
+  if(!BACKEND){
+    DATA.book.strategies=DATA.book.strategies.filter(s=>s.name!==strategy);
+    if(decision==="approved"){const c=DEMO_CANDS.find(x=>x.strategy===strategy)||{};
+      DATA.book.strategies.push({name:strategy,label:c.agent||strategy,weight:0,source:"lab",
+        family:c.family,sharpe:c.sharpe,corr:c.corr,delta:c.delta});}
+    apply();return;
+  }
   fetch("/api/decide",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({strategy,decision})}).then(r=>r.json()).then(apply).catch(apply);
 }
@@ -438,7 +470,7 @@ $("#runAgents")&&$("#runAgents").addEventListener("click",runAgents);
 fetch("/api/health").then(r=>r.ok?r.json():null).then(j=>{
   if(j&&j.ok){BACKEND=true;$("#logState").textContent="backend live";$("#logState").classList.add("up");
     $(".log-empty")&&($(".log-empty").textContent="// backend connected — one click runs the real pipeline");
-    pollAccount();setInterval(pollAccount,25000);}
+    pollAccount();setInterval(pollAccount,25000);loadBook();}
 }).catch(()=>{});
 
 /* ---------------- init ---------------- */

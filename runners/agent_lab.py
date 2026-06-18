@@ -147,13 +147,17 @@ def run(emit_path=None):
         bsh = _sh(blend)
         delta = bsh - _sh(e)
         folds = walk_forward_folds(c, n_folds=5)
+        fold_srs = [round(f["sharpe"], 2) for f in folds]
         wf_pos = sum(1 for f in folds if f["sharpe"] > 0)
         st = per[name]
         dsr = probabilistic_sharpe_ratio(st["sr"], st["n"], st["skew"], st["kurt"],
                                          sr_benchmark=sr_star)
         _say("validate", agent,
              f"Sharpe {sh:.2f} | maxDD {dd:.1%} | corr->ens {corr:+.2f} | "
-             f"blend {bsh:.2f} ({delta:+.2f}) | WF {wf_pos}/5 +ve | DSR {dsr:.0%}")
+             f"blend {bsh:.2f} ({delta:+.2f}) | DSR {dsr:.0%}")
+        _say("validate", agent,
+             f"walk-forward {len(folds)} folds | +ve in {wf_pos}/{len(folds)} | "
+             f"fold Sharpes {fold_srs}")
 
         # ---- execute (DRY-RUN) ----------------------------------------------
         try:
@@ -175,8 +179,8 @@ def run(emit_path=None):
             "thesis": spec["thesis"], "params": LAB_PARAMS.get(name, {}),
             "sharpe": round(sh, 3), "maxdd": round(dd, 4), "corr": round(corr, 3),
             "blend": round(bsh, 3), "delta": round(delta, 4),
-            "wf_pos": wf_pos, "wf_n": len(folds), "dsr": round(dsr, 4),
-            "verdict": verdict, "reason": reason,
+            "wf_pos": wf_pos, "wf_n": len(folds), "wf_folds": fold_srs,
+            "dsr": round(dsr, 4), "verdict": verdict, "reason": reason,
         })
 
     # ---- summary -------------------------------------------------------------

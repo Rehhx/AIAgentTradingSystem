@@ -1,0 +1,59 @@
+{
+  "name": "Equity ensemble (no-margin, crash sentinel)",
+  "note": "the deployed Account-1 book; benchmark the lab clears",
+  "sharpe": 1.59,
+  "cagr": 0.105,
+  "maxdd": -0.078,
+  "strategies": [
+    {
+      "name": "rsi2_meanrev",
+      "label": "RSI-2 mean reversion",
+      "weight": 0.252,
+      "source": "core",
+      "family": "reversion"
+    },
+    {
+      "name": "donchian",
+      "label": "Donchian breakout",
+      "weight": 0.198,
+      "source": "core",
+      "family": "trend"
+    },
+    {
+      "name": "recovery",
+      "label": "Recovery thrust (V-snapback)",
+      "weight": 0.162,
+      "source": "core",
+      "family": "trend"
+    },
+    {
+      "name": "trend_5020",
+      "label": "50/200 trend",
+      "weight": 0.126,
+      "source": "core",
+      "family": "trend"
+    },
+    {
+      "name": "lowvol_defensive",
+      "label": "Low-vol defensive",
+      "weight": 0.1,
+      "source": "core",
+      "family": "structure"
+    },
+    {
+      "name": "pead",
+      "label": "Post-earnings drift",
+      "weight": 0.09,
+      "source": "core",
+      "family": "structure"
+    },
+    {
+      "name": "xs_momentum",
+      "label": "Cross-sectional dual-momentum",
+      "weight": 0.072,
+      "source": "core",
+      "family": "trend"
+    }
+  ],
+  "overlay": "VIX crash sentinel \u2014 de-risk to 60% on early-warning or VIX backwardation"
+}

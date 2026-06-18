@@ -66,6 +66,7 @@ assert not any("--live" in s["argv"] for s in PIPELINE + AGENT_PIPELINE), \
 
 CANDIDATES = WEB / "candidates.json"
 DECISIONS = WEB / "decisions.json"
+BOOK = WEB / "book.json"
 
 RUN = {"id": 0, "lines": [], "phase": None, "status": "idle"}
 LOCK = threading.Lock()
@@ -157,16 +158,55 @@ def _load_decisions():
     return {}
 
 
+def _load_book():
+    if BOOK.is_file():
+        try:
+            return json.loads(BOOK.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"name": "Equity ensemble", "strategies": []}
+
+
+def _candidate(strategy):
+    if CANDIDATES.is_file():
+        try:
+            for c in json.loads(CANDIDATES.read_text(encoding="utf-8")).get("candidates", []):
+                if c.get("strategy") == strategy:
+                    return c
+        except Exception:
+            pass
+    return None
+
+
 def _record_decision(strategy, decision):
-    """persist a human approve/reject for a candidate. Approved candidates are
-    only MARKED for promotion — going live still needs the deliberate --live
-    command run by a human, never this server."""
-    if decision not in ("approved", "rejected", "pending"):
+    """persist a human approve/reject AND keep the book of strategies in sync:
+    approve -> add the candidate sleeve to book.json; reject -> remove it if present.
+    Adding to the book MARKS it for the book only — going live still needs the
+    deliberate --live command run by a human, never this server."""
+    if decision not in ("approved", "rejected", "pending") or not strategy:
         return None
     with _DEC_LOCK:
         d = _load_decisions()
         d[strategy] = {"decision": decision, "ts": time.strftime("%Y-%m-%d %H:%M:%S")}
         DECISIONS.write_text(json.dumps(d, indent=2), encoding="utf-8")
+
+        book = _load_book()
+        sleeves = book.setdefault("strategies", [])
+        sleeves[:] = [s for s in sleeves if s.get("name") != strategy]   # drop any prior copy
+        if decision == "approved":
+            c = _candidate(strategy)
+            sleeves.append({
+                "name": strategy,
+                "label": (c or {}).get("agent", strategy),
+                "weight": 0.0,                       # paper sleeve; sizing decided at deploy
+                "source": "lab",
+                "family": (c or {}).get("family", ""),
+                "sharpe": (c or {}).get("sharpe"),
+                "corr": (c or {}).get("corr"),
+                "delta": (c or {}).get("delta"),
+                "added": time.strftime("%Y-%m-%d"),
+            })
+        BOOK.write_text(json.dumps(book, indent=2), encoding="utf-8")
     return d[strategy]
 
 
@@ -233,6 +273,8 @@ class Handler(BaseHTTPRequestHandler):
                     if CANDIDATES.is_file() else {"candidates": []})
             data["decisions"] = _load_decisions()
             return self._send(200, json.dumps(data))
+        if u.path == "/api/book":
+            return self._send(200, json.dumps(_load_book()))
         if u.path == "/api/log":
             since = int((parse_qs(u.query).get("since", ["0"])[0]) or 0)
             with LOCK:
