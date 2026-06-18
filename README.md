@@ -13,6 +13,12 @@ paper trading, and a from-scratch statistical-rigor + backtesting toolkit.
 > look-ahead-free event engine. The honest conclusion of all that rigor is below, and
 > it is not "we beat the market with secret alpha."
 
+## 🎥 Demo
+
+**[Watch the demo on YouTube →](https://youtu.be/q9O1Rz0A4FI)** — a walkthrough of the
+cockpit (live dashboard, the 12 AI agents inventing and validating strategies via the
+Claude API, and the one-click control pipeline) and the rest of what we built.
+
 ---
 
 ## The two core findings
