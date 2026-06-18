@@ -19,6 +19,20 @@ paper trading, and a from-scratch statistical-rigor + backtesting toolkit.
 cockpit (live dashboard, the 12 AI agents inventing and validating strategies via the
 Claude API, and the one-click control pipeline) and the rest of what we built.
 
+### The cockpit (`python web/server.py` → http://127.0.0.1:8787)
+
+**Dashboard** — live 3-account book, the equity-ensemble curve vs SPY, and the rigor battery.
+![Dashboard](images/img.png)
+
+**AI Agents — going to work** — one click sends the 12 agents to invent fresh strategies via the Claude API.
+![AI agents running](images/img_1.png)
+
+**AI Agents — finished** — each invented strategy, validated against the ensemble (Sharpe, correlation, walk-forward, deflated Sharpe) and laid out for you to approve or reject.
+![AI agents finished — invented strategies](images/img_2.png)
+
+**Control** — one-click research → build → validate → deploy pipeline, gated before any live order.
+![Control page](images/img_3.png)
+
 ---
 
 ## The two core findings
