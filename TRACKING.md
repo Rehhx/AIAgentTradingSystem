@@ -1,16 +1,16 @@
-# Live Paper-vs-Backtest Tracking — 2026-06-17
+# Live Paper-vs-Backtest Tracking — 2026-06-18
 
-Current regime: **BULL_CALM**
+Current regime: **BULL_VOL**
 
 ## Backtest expectation (deployed book, no-crypto base)
 - Expected annual return **19.2%** · vol **11.5%** · Sharpe **1.53**
 - Expected daily: **+0.070% ± 0.72%**
 - Honest worst-case drawdown: **~−25% (bootstrap p5) / ~−32% (2008 GFC)** — *not* −13.7%
 
-## Live track record (11 sessions since 2026-05-30)
+## Live track record (12 sessions since 2026-05-30)
 
-- Live cumulative **-0.04%** · realized Sharpe -0.03 · current drawdown -2.3%
-- Expected after 11 days: **+0.77%** (2σ band -4.0% … +5.6%)
+- Live cumulative **-0.38%** · realized Sharpe -0.66 · current drawdown -2.3%
+- Expected after 12 days: **+0.84%** (2σ band -4.2% … +5.8%)
 - **Tracking: ON TRACK**
 
 ## Real fill quality (paper vs perfect liquidity)
