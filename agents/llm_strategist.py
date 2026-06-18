@@ -22,12 +22,24 @@ from __future__ import annotations
 
 import ast
 import json
+import random
 import re
 
 import numpy as np
 import pandas as pd
 
 MODEL = "claude-opus-4-8"
+
+
+def _house_helpers() -> dict:
+    """the trusted, causal house helpers we expose INSIDE the sandbox so invented
+    strategies can be written in our codebase's idiom (and stay concise)."""
+    try:
+        from agents.daily_strategies import _rsi, _state_machine
+        from agents.lab_strategies import _atr, _hold
+        return {"_rsi": _rsi, "_atr": _atr, "_state_machine": _state_machine, "_hold": _hold}
+    except Exception:
+        return {}
 
 # ---- AST sandbox -----------------------------------------------------------
 _ALLOWED_BUILTINS = {
@@ -63,7 +75,7 @@ def safe_compile(code: str):
                 raise ValueError(f"attribute '{node.attr}' is not allowed")
         if isinstance(node, ast.Name) and node.id in _FORBIDDEN_NAMES:
             raise ValueError(f"name '{node.id}' is not allowed")
-    ns = {"pd": pd, "np": np, "__builtins__": _ALLOWED_BUILTINS}
+    ns = {"pd": pd, "np": np, **_house_helpers(), "__builtins__": _ALLOWED_BUILTINS}
     exec(compile(tree, "<llm_signal>", "exec"), ns)
     fn = ns.get("signal")
     if not callable(fn):
@@ -125,9 +137,10 @@ def validate_spec(spec: dict, probe_df: pd.DataFrame):
 
 
 # ---- LLM proposal ----------------------------------------------------------
-_SYSTEM = """You are a senior quant researcher inventing ORIGINAL daily/multi-day
-equity trading signals. Invent genuinely new mechanisms from first principles — do
-NOT reproduce textbook indicators (RSI, MACD, Bollinger, Donchian, classic 50/200).
+_SYSTEM = """You are a senior quant researcher on this desk, inventing ORIGINAL
+daily/multi-day equity trading signals that fit OUR codebase. Invent genuinely new
+mechanisms from first principles — do NOT reproduce textbook indicators (RSI, MACD,
+Bollinger, Donchian, classic 50/200) and do NOT duplicate our existing sleeves.
 
 Return ONLY a JSON array of objects, each:
 {
@@ -141,32 +154,105 @@ Return ONLY a JSON array of objects, each:
 Hard rules for `code`:
 - Signature exactly: def signal(d, params): ... return a pandas Series.
 - `d` is a daily OHLCV DataFrame with columns open, high, low, close, volume.
-- Use ONLY pandas (as pd) and numpy (as np). NO imports, NO file/network/system
-  access, NO eval/exec, NO .query/.eval/.to_*/.read_*.
-- Return a Series aligned to d.index with values in [0,1] (0=flat, 1=full long,
-  fractions allowed). End with .fillna(0).
-- CAUSAL ONLY: use rolling windows and POSITIVE shifts. Never use the whole series'
-  global .max()/.min()/.mean(), never .shift(negative), never future indices. Do NOT
-  shift the final signal yourself (the backtester enters next day).
-- Read params via params.get("name", default) so defaults exist.
+- You MAY use pandas (pd), numpy (np), AND these house helpers ALREADY IN SCOPE
+  (do not import or redefine them):
+    _rsi(series, n)                      -> Wilder RSI series
+    _atr(d, n)                           -> average true range series
+    _state_machine(enter, exit_, index)  -> hold long between enter/exit booleans
+    _hold(events, hold, index)           -> latch 1.0 for `hold` bars after each event
+- NO imports, NO file/network/system access, NO eval/exec, NO .query/.eval/.to_*/.read_*.
+- Return a Series aligned to d.index, values in [0,1] (0=flat, 1=full long, fractions ok).
+  End with .fillna(0).
+- CAUSAL ONLY: rolling windows + POSITIVE shifts only. Never the whole series' global
+  .max()/.min()/.mean(), never .shift(negative), never future indices. Do NOT shift the
+  final signal yourself (the backtester enters next day).
+- Read params via params.get("name", default).
 Output the JSON array and nothing else."""
+
+# research angles — a few are drawn per run so each batch explores new territory
+_THEMES = [
+    "volume / liquidity dynamics", "volatility-regime shifts", "overnight vs intraday behavior",
+    "gap continuation and gap fade", "where the close sits within the day's range",
+    "drawdown depth and the shape of the recovery", "trend persistence and path quality",
+    "calendar / seasonality / turn-of-month", "price acceleration and inflection",
+    "support/resistance reclaim and failed breakouts", "consecutive up/down streak overreaction",
+    "range compression then expansion", "relative strength vs a name's own history",
+    "true-range and high-low structure", "close-to-open vs open-to-close asymmetry",
+]
+
+
+def _codebase_context() -> tuple[str, list]:
+    """pull REAL source from our codebase (helpers + two example sleeves) so the LLM
+    builds in our idiom, plus the existing strategy names to avoid duplicating."""
+    import inspect
+    parts, names = [], []
+    try:
+        from agents.daily_strategies import _rsi, STRATEGIES_DAILY, CANDIDATE_STRATEGIES
+        from agents import lab_strategies as lab
+        for obj in (lab._atr, _rsi, lab.sig_mean_gravity, lab.sig_coil_release):
+            try:
+                parts.append(inspect.getsource(obj))
+            except Exception:
+                pass
+        names = sorted(set(list(lab.LAB_STRATEGIES) + list(STRATEGIES_DAILY)
+                           + list(CANDIDATE_STRATEGIES)))
+    except Exception:
+        pass
+    return "\n\n".join(parts), names
+
+
+def _anthropic_http(system: str, prompt: str, model: str, max_tokens: int = 16000):
+    """call the Claude API directly over HTTPS (stdlib only). Robust inside nested
+    subprocesses where the bundled CLI transport deadlocks. Returns text or None."""
+    try:
+        from config import ANTHROPIC_API_KEY as key
+    except Exception:
+        key = ""
+    if not key:
+        return None
+    import sys
+    import urllib.request
+    body = json.dumps({"model": model, "max_tokens": max_tokens, "system": system,
+                       "messages": [{"role": "user", "content": prompt}]}).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages", data=body,
+        headers={"content-type": "application/json", "x-api-key": key,
+                 "anthropic-version": "2023-06-01"})
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r:
+            data = json.loads(r.read().decode())
+        return "".join(b.get("text", "") for b in data.get("content", [])
+                       if b.get("type") == "text")
+    except Exception as e:
+        print(f"  [llm api error: {str(e)[:90]}]", file=sys.stderr, flush=True)
+        return None
 
 
 def propose_batch(n: int, avoid=None, seed=None, model: str = MODEL) -> list[dict]:
-    """ask Claude for n fresh strategy specs. Returns [] on any failure (no key,
-    sdk missing, bad JSON) so the caller can fall back."""
-    avoid = sorted(set(avoid or []))
-    prompt = (f"Invent {n} NEW, mutually-distinct equity signals as specified. "
-              f"Make them decorrelated from trend-following and from each other. ")
-    if avoid:
-        prompt += "Do NOT duplicate these existing mechanisms: " + ", ".join(avoid) + ". "
-    if seed is not None:
-        prompt += f"(diversity seed {seed}) "
-    try:
-        from agents._claude_sdk import ask_claude
-        text = ask_claude(prompt=prompt, system_prompt=_SYSTEM, allowed_tools=[], model=model)
-    except Exception:
-        return []
+    """ask Claude to INVENT n fresh strategy specs, grounded in our codebase and a
+    rotating set of research angles. Returns [] on any failure so the caller falls back."""
+    ctx, names = _codebase_context()
+    avoid = sorted(set(list(avoid or []) + names))
+    rng = random.Random(seed)
+    themes = rng.sample(_THEMES, k=min(4, len(_THEMES)))
+    prompt = (
+        f"Invent {n} NEW, mutually-distinct daily equity signals.\n"
+        f"This run, explore these angles (use each at least once): {', '.join(themes)}.\n"
+        "Make them decorrelated from trend-following and from each other. Prefer ideas that "
+        "would DIVERSIFY a 7-sleeve long/flat equity ensemble (low correlation beats raw Sharpe).\n"
+        + (f"Do NOT duplicate our existing sleeves: {', '.join(avoid)}.\n" if avoid else "")
+        + "\nBuild in the style of our codebase below; you may call the house helpers shown.\n"
+        + "=== OUR CODEBASE (helpers + two example sleeves) ===\n" + ctx
+    )
+    # primary: direct HTTPS API (works inside the server's subprocess). fall back
+    # to the agent-sdk CLI only if the API path is unavailable.
+    text = _anthropic_http(_SYSTEM, prompt, model)
+    if not text:
+        try:
+            from agents._claude_sdk import ask_claude
+            text = ask_claude(prompt=prompt, system_prompt=_SYSTEM, allowed_tools=[], model=model)
+        except Exception:
+            return []
     return _parse(text)
 
 

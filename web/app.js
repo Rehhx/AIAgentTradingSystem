@@ -315,10 +315,13 @@ function renderCandidates(data){
   $("#benchLine").textContent=`benchmark — equity ensemble · Sharpe ${bm.sharpe.toFixed(2)} · the bar to clear`;
   const cands=(data.candidates||[]).slice().sort((a,b)=>b.delta-a.delta);
   const n=cands.length, imp=cands.filter(c=>c.delta>0).length;
+  const modeTxt=data.mode==='llm'?`<b class="violet">${data.n_llm||0} Claude-invented</b>`
+    :(data.mode==='param-search'?'<b class="amber">param-search (LLM offline)</b>':'demo batch');
   $("#candGrid").innerHTML=
-    `<div class="lab-summary">${n} original mechanisms tested · <b class="up">${imp}</b> raise the blended Sharpe ·
+    `<div class="lab-summary">${modeTxt} · batch #${data.seed||'demo'} · ${n} mechanisms ·
+      <b class="up">${imp}</b> raise the blend ·
       <b class="amber">${cands.filter(c=>c.verdict==='REVIEW').length}</b> for review ·
-      deflation hurdle SR* ${(data.sr_star_annual||DEMO_SRSTAR).toFixed(2)} (corrected for ${n} trials)</div>`+
+      SR* ${(data.sr_star_annual||DEMO_SRSTAR).toFixed(2)} (deflated for ${n} trials)</div>`+
     cands.map(c=>{
       const vc=c.verdict==="PROMOTE"?"up":c.verdict==="REVIEW"?"amber":"down";
       const d=dec[c.strategy]?dec[c.strategy].decision:"pending";
@@ -383,9 +386,15 @@ function simAgents(){
 function runAgents(){
   if(running)return;running=true;
   const b=$("#runAgents");if(b){b.disabled=true;b.classList.add("busy");}
-  const s=$("#agentsState");s.textContent="running…";s.className="tag amber";
-  const log=$("#agentLog");log.hidden=false;log.innerHTML="";$("#candGrid").innerHTML="";
-  if(!BACKEND){simAgents();return;}
+  const s=$("#agentsState");s.className="tag amber";
+  const log=$("#agentLog");log.hidden=false;log.innerHTML="";
+  if(!BACKEND){
+    s.textContent="demo — start backend for live Claude invention";
+    $("#candGrid").innerHTML=`<div class="lab-summary">Offline demo. Run <b>python web/server.py</b> and open it at 127.0.0.1:8787 so the agents invent live via Claude.</div>`;
+    simAgents();return;
+  }
+  s.textContent="Claude inventing strategies… (~1–2 min)";
+  $("#candGrid").innerHTML=`<div class="lab-summary">⟳ Claude is inventing a fresh batch and validating each one against the ensemble — watch the log above. This takes ~1–2 minutes.</div>`;
   fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"agents"})})
     .then(r=>r.json()).then(()=>{
       let since=0;
