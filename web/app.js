@@ -31,7 +31,8 @@ const DATA = {
     {name:"trend_5020",label:"50/200 trend",weight:0.126,source:"core",family:"trend"},
     {name:"lowvol_defensive",label:"Low-vol defensive",weight:0.10,source:"core",family:"structure"},
     {name:"pead",label:"Post-earnings drift",weight:0.09,source:"core",family:"structure"},
-    {name:"xs_momentum",label:"Cross-sectional dual-momentum",weight:0.072,source:"core",family:"trend"}
+    {name:"xs_momentum",label:"Cross-sectional dual-momentum",weight:0.072,source:"core",family:"trend"},
+    {name:"mean_gravity",label:"gravity (lab)",weight:0.05,source:"lab",family:"reversion",validated:true}
   ], overlay:"VIX crash sentinel — de-risk to 60% on early-warning or VIX backwardation"},
   agents: {
     research:[["research_agent","invents equity strategies, web + first-principles"],
@@ -137,7 +138,7 @@ function renderBook(book){
     return `<div class="bk-row${lab?' lab':''}" style="--fc:${FAMC[s.family]||'var(--dim2)'}">
       <span class="bk-dot"></span>
       <div class="bk-name">${s.label||s.name}<span>${s.name}</span></div>
-      <span class="bk-src">${lab?'lab · approved':'core'}</span>
+      <span class="bk-src">${lab?(s.validated?'lab · validated':'lab · approved'):'core'}</span>
       <b class="bk-w">${w}</b></div>`;
   }).join("")+(book.overlay?`<div class="bk-overlay">⛨ ${book.overlay}</div>`:"");
 }

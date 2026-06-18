@@ -53,6 +53,20 @@
       "weight": 0.072,
       "source": "core",
       "family": "trend"
+    },
+    {
+      "name": "mean_gravity",
+      "label": "gravity (lab)",
+      "weight": 0.05,
+      "source": "lab",
+      "family": "reversion",
+      "validated": true,
+      "sharpe": 0.785,
+      "corr": 0.217,
+      "wf": "4/5",
+      "dsr": 0.642,
+      "best_weight": 0.25,
+      "added": "2026-06-18"
     }
   ],
   "overlay": "VIX crash sentinel \u2014 de-risk to 60% on early-warning or VIX backwardation"

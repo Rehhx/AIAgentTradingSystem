@@ -108,6 +108,13 @@ helps but is too correlated (0.81) to add much. The other 10 are honest rejects:
 ensemble already owns those return shapes — consistent with the **diversification ceiling**.
 The lever remains *decorrelation*, not another high-Sharpe long-equity sleeve.
 
+**`mean_gravity` cleared walk-forward and was promoted** (`runners/validate_mean_gravity.py`):
+positive standalone in **5/5** folds, blend improves in 3/4, 4/5 and 5/6 contiguous folds,
+PSR-vs-zero 99%, survives the 12-trial deflation (DSR 64%, clears the SR\* 0.67 hurdle). It's
+in the book at a **conservative 5% pilot weight** (in-sample optimum was 25% — deliberately not
+used). Each `run 12 agents` now also samples a **fresh parameter batch**, so the desk keeps
+exploring new candidates rather than re-testing the same twelve.
+
 ---
 
 ## The deployable book + today's fix
