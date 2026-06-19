@@ -34,10 +34,13 @@ from agents.daily_strategies import (
     STRATEGIES_DAILY, CANDIDATE_STRATEGIES, DEPLOY_PARAMS,
     DEFAULT_UNIVERSE, QUALITY_UNIVERSE, daily_bars, RT_COST,
 )
+from agents.lab_strategies import LAB_STRATEGIES, LAB_PARAMS
 from agents.execution_agent import ExecutionAgent
 
-# all sig functions available to the rebalancer (core + promoted candidates)
-ALL_SIGNALS = {**STRATEGIES_DAILY, **CANDIDATE_STRATEGIES}
+# all sig functions available to the rebalancer (core + promoted candidates +
+# walk-forward-validated lab sleeves, e.g. mean_gravity)
+ALL_SIGNALS = {**STRATEGIES_DAILY, **CANDIDATE_STRATEGIES, **LAB_STRATEGIES}
+DEPLOY_PARAMS = {**DEPLOY_PARAMS, **{k: LAB_PARAMS[k] for k in ("mean_gravity",) if k in LAB_PARAMS}}
 
 # each book maps sub-strategy -> capital weight (weights sum to 1).
 BOOKS = {
@@ -75,14 +78,15 @@ BOOKS = {
     # Sharpe to 1.43 and CAGR to 17.1% at -14.1% DD. Run with --vol-target 0.15.
     "portfolio_rec": {"rsi2_meanrev": 0.32, "donchian": 0.24, "trend_5020": 0.16,
                       "xs_dualmom": 0.08, "recovery": 0.20},
-    # portfolio_full: 7 sleeves — core + recovery (bull capture) + PEAD (event
-    # smoothing) + defensive lowvol (bear/vol ballast: holds the 30 lowest-vol S&P
-    # names while SPY > 200d, rotates to BIL otherwise). The six price sleeves are
-    # scaled to 90% and lowvol takes 10%. Sharpe 1.53, 18.4% CAGR, -13.4% DD, 5/5
-    # folds. Run with --vol-target 0.17 --max-leverage 1.8.
-    "portfolio_full": {"rsi2_meanrev": 0.252, "donchian": 0.198, "trend_5020": 0.126,
-                       "xs_dualmom": 0.072, "recovery": 0.162, "pead": 0.090,
-                       "lowvol_def": 0.10},
+    # portfolio_full: 8 sleeves — core + recovery (bull capture) + PEAD (event
+    # smoothing) + defensive lowvol (bear/vol ballast) + a 5% pilot of mean_gravity
+    # (the walk-forward-validated lab sleeve: ATR-stretch reversion, corr +0.22 to the
+    # book, +ve in 5/5 folds — see runners/validate_mean_gravity.py). The other seven
+    # sleeves are scaled to 0.95 so the book still sums to 1.0.
+    # Run with --vol-target 0.17 --max-leverage 1.8.
+    "portfolio_full": {"rsi2_meanrev": 0.239, "donchian": 0.188, "trend_5020": 0.120,
+                       "xs_dualmom": 0.068, "recovery": 0.154, "pead": 0.086,
+                       "lowvol_def": 0.095, "mean_gravity": 0.050},
     # managed_futures: standalone long/SHORT trend (CTA) book for ACCOUNT 2 -- crisis
     # alpha. Diversified time-series momentum across 10 asset ETFs, vol-targeted.
     # Profits in macro bears (2022 +6.5% vs S&P -18%); choppy in calm bulls. REQUIRES
