@@ -35,6 +35,7 @@ from agents.daily_strategies import (
     DEFAULT_UNIVERSE, QUALITY_UNIVERSE, daily_bars, RT_COST,
 )
 from agents.lab_strategies import LAB_STRATEGIES, LAB_PARAMS
+from agents.rag_vault import apply_sentiment_overlay
 from agents.execution_agent import ExecutionAgent
 
 # all sig functions available to the rebalancer (core + promoted candidates +
@@ -238,7 +239,9 @@ def target_weights(book: str, universe: list, source: str = "auto",
                    max_lev: float = 1.0, park_cash: str = "BIL",
                    early_warning: bool = True, name_cap: float = 0.0,
                    crypto_weight: float = 0.0, ensemble: bool = True,
-                   park_riskon: str | None = None) -> tuple[dict, dict, dict]:
+                   park_riskon: str | None = None,
+                   sentiment_overlay: bool = False,
+                   sentiment_tilt: float = 0.25) -> tuple[dict, dict, dict]:
     """returns (weights, last_price, detail). Per-ticker sleeves give each long
     name alloc/N. The 'xs_dualmom' sleeve ranks a (possibly larger) universe by
     12-1 momentum and gives the top-K names alloc/K (cash when SPY < its 200d
@@ -395,6 +398,15 @@ def target_weights(book: str, universe: list, source: str = "auto",
         elif leverage != 1.0:
             weights = {t: w * leverage for t, w in weights.items()}
 
+    # RAG-Vault sentiment overlay (OPT-IN, default off): tilt each held name by
+    # the vault's IC-weighted LONG/SHORT/FLAT verdict (Claude sentiment + supplier
+    # lead-lag + 8-K drift). LONG boosts, SHORT trims toward flat (we don't short).
+    # Bounded +/- sentiment_tilt per name; fail-safe (book unchanged if the vault is
+    # offline). Applied here so name-cap / vol-target / de-risk / cash-park still
+    # bound and rebalance the tilted book downstream. See agents/rag_vault.py.
+    if sentiment_overlay:
+        weights = apply_sentiment_overlay(weights, tilt=sentiment_tilt)
+
     # crypto sleeve (OPT-IN, default off): absolute-momentum on BTC/ETH. Carves out
     # crypto_weight from the book (scales the rest down) and allocates to each crypto
     # whose 6-month trend is up, else leaves it idle -> BIL. GOVERNANCE-GATED: only
@@ -543,6 +555,11 @@ def main():
                     help="OPT-IN: enable the BTC/ETH momentum sleeve (needs board sign-off)")
     ap.add_argument("--crypto-weight", type=float, default=0.05,
                     help="crypto sleeve weight when --crypto-sleeve is set (default 5%%)")
+    ap.add_argument("--sentiment-overlay", action="store_true",
+                    help="OPT-IN: tilt held names by the RAG-Vault sentiment API "
+                         "(needs SIGNAL_API_URL; fail-safe if the vault is offline)")
+    ap.add_argument("--sentiment-tilt", type=float, default=0.25,
+                    help="max +/- weight tilt per name from the sentiment overlay (default 25%%)")
     ap.add_argument("--account", type=int, default=1, choices=[1, 2, 3],
                     help="which Alpaca paper account (1=default, 2=ALPACA_*_2, 3=ALPACA_*_3 options)")
     ap.add_argument("--no-ensemble", action="store_true",
@@ -585,7 +602,9 @@ def main():
         early_warning=(not args.no_early_warning), name_cap=args.name_cap,
         crypto_weight=(args.crypto_weight if args.crypto_sleeve else 0.0),
         ensemble=(not args.no_ensemble),
-        park_riskon=(args.park_market.strip().upper() or None))
+        park_riskon=(args.park_market.strip().upper() or None),
+        sentiment_overlay=args.sentiment_overlay,
+        sentiment_tilt=args.sentiment_tilt)
     equity, esrc = get_equity(agent, args.notional)
     held = current_positions(agent)
 

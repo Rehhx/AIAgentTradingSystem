@@ -28,4 +28,5 @@ pytest>=8.0.0            # run with: python -m pytest tests/
 
 # utilities
 python-dotenv>=1.0.0     # for .env API key management
+requests>=2.31.0         # RAG Vault sentiment signal API client (agents/rag_vault.py)
 tqdm>=4.66.0             # progress bars for data loading
