@@ -96,6 +96,17 @@ def _account_snapshot():
     except Exception as e:
         out["error"] = f"alpaca import failed: {e}"
         return out
+    sig = _signals_snapshot()                       # cached; for per-holding verdicts
+    bt = sig.get("by_ticker", {}) if sig.get("ok") else {}
+
+    def _pos(p):
+        sym = p.symbol.replace(".", "-")
+        r = {"sym": sym, "mv": float(p.market_value), "pl": float(p.unrealized_pl)}
+        v = bt.get(sym.upper())
+        if v and v.get("direction") in ("long", "short"):
+            r.update(vdir=v["direction"], vconv=v["conviction"], vconf=v["confidence"])
+        return r
+
     for acc in (1, 2, 3):
         row = {"id": acc, "name": _ACCT_NAMES[acc], "status": "ok"}
         key, sec = alpaca_keys(acc)
@@ -111,9 +122,7 @@ def _account_snapshot():
             top = sorted(pos, key=lambda p: -abs(float(p.market_value)))[:5]
             row.update({"equity": eq, "last_equity": last, "cash": float(a.cash),
                         "today": (eq / last - 1) if last else 0.0, "pl": eq - last,
-                        "n_pos": len(pos),
-                        "top": [{"sym": p.symbol.replace(".", "-"), "mv": float(p.market_value),
-                                 "pl": float(p.unrealized_pl)} for p in top]})
+                        "n_pos": len(pos), "top": [_pos(p) for p in top]})
         except Exception as e:
             row["status"] = "error"
             row["err"] = str(e)[:80]
@@ -150,13 +159,13 @@ def _signals_snapshot():
         from agents.rag_vault import RagVaultSignals
         verdicts = RagVaultSignals().signals()                  # whole ranked universe
         covered = [v for v in verdicts if v.get("coverage")]
-        longs = sorted((_row(v) for v in covered if v.get("direction") == "long"),
-                       key=lambda r: -r["conviction"])
-        shorts = sorted((_row(v) for v in covered if v.get("direction") == "short"),
-                        key=lambda r: r["conviction"])
+        rows = [_row(v) for v in covered]
+        by_ticker = {r["ticker"].upper(): r for r in rows if r.get("ticker")}
+        longs = sorted((r for r in rows if r["direction"] == "long"), key=lambda r: -r["conviction"])
+        shorts = sorted((r for r in rows if r["direction"] == "short"), key=lambda r: r["conviction"])
         out.update({"ok": True, "universe": len(covered),
                     "as_of": covered[0].get("as_of") if covered else None,
-                    "longs": longs[:8], "shorts": shorts[:8]})
+                    "longs": longs[:8], "shorts": shorts[:8], "by_ticker": by_ticker})
     except Exception as e:
         out["error"] = f"{type(e).__name__}: {e}"
     with _SIG_LOCK:

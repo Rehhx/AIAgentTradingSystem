@@ -210,11 +210,18 @@ function renderLive(d){
         <div class="lc-eq" style="font-size:15px;color:var(--dim2)">${a.status==='no-keys'?'no keys':'offline'}</div></div>`;}
     any=true;tot+=a.equity;totPl+=a.pl;
     const up=a.today>=0,vs=spy!=null?a.today-spy:null;
+    const holds=(a.top||[]).map(p=>{
+      const v=p.vdir, vc=v==='long'?'up':'down';
+      const ttl=`${p.sym} · ${money(p.mv)}`+(v?` · vault ${v} ${p.vconv>=0?'+':''}${p.vconv}σ (${p.vconf})`:' · vault: flat / not covered');
+      const pill=v?`<i class="vp ${vc}">${v==='long'?'▲':'▼'}</i>`:'';
+      return `<span class="lc-hold${v?' '+vc:''}" title="${esc2(ttl)}">${esc2(p.sym)}${pill}</span>`;
+    }).join("");
     return `<div class="live-card" style="animation-delay:${(i+1)*60}ms">
       <div class="lc-name">${a.name}<span>#${a.id} · ${a.n_pos} pos</span></div>
       <div class="lc-eq">${money(a.equity)}</div>
       <div class="lc-row"><span class="${up?'up':'down'}">${up?'▲':'▼'} ${(a.today*100).toFixed(2)}%</span>
-        ${vs!=null?`<span class="lc-vs ${vs>=0?'up':'down'}">${vs>=0?'+':''}${(vs*100).toFixed(2)}% vs SPY</span>`:''}</div></div>`;
+        ${vs!=null?`<span class="lc-vs ${vs>=0?'up':'down'}">${vs>=0?'+':''}${(vs*100).toFixed(2)}% vs SPY</span>`:''}</div>
+      ${a.top&&a.top.length?`<div class="lc-holds" title="vault verdict per held name">${holds}</div>`:''}</div>`;
   }).join("");
   const tUp=totPl>=0;
   const totalCard=`<div class="live-card total">
