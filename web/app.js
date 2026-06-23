@@ -12,7 +12,7 @@ const DATA = {
     {k:"CAGR",          v:10.5,  d:"equity ensemble",    vc:"var(--text)",suf:"%",dec:1},
     {k:"Max Drawdown",  v:-7.8,  d:"vs SPY −33.7%",      vc:"var(--up)",  suf:"%",dec:1},
     {k:"Walk-forward",  v:5,     d:"of 5 folds positive",vc:"var(--text)",suf:"/5"},
-    {k:"Unit tests",    v:63,    d:"rigor · engine · CV",vc:"var(--cyan)",suf:" ✓"},
+    {k:"Unit tests",    v:71,    d:"rigor · engine · CV",vc:"var(--cyan)",suf:" ✓"},
   ],
   rigor: [
     {l:"Deflated Sharpe (best sleeve)", v:"99.4%", w:"99%", good:1, n:"corrected for 13 trials"},
@@ -61,6 +61,15 @@ const DEMO_BENCH={"sharpe":1.591,"cagr":0.1051,"maxdd":-0.0775};
 const DEMO_SRSTAR=0.674;
 const DEMO_CANDS=[{"agent":"gravity","strategy":"mean_gravity","family":"reversion","thesis":"stretch below a long anchor in ATR units mean-reverts to the anchor","sharpe":0.785,"maxdd":-0.0371,"corr":0.217,"blend":1.612,"delta":0.0216,"wf_pos":5,"wf_n":5,"dsr":0.6415,"verdict":"REVIEW","reason":"improves the blend but DSR 64%"},{"agent":"regime-dial","strategy":"vol_regime_switch","family":"volatility","thesis":"size inversely to the volatility percentile - full when calm, flat when stormy","sharpe":1.366,"maxdd":-0.0557,"corr":0.808,"blend":1.597,"delta":0.006,"wf_pos":5,"wf_n":5,"dsr":0.9852,"verdict":"REVIEW","reason":"improves the blend but corr too high"},{"agent":"breadth-int","strategy":"breadth_thrust_self","family":"trend","thesis":"a name's own internal breadth thrust signals broad-based ignition","sharpe":0.0,"maxdd":0.0,"corr":0.0,"blend":1.591,"delta":-0.0,"wf_pos":0,"wf_n":5,"dsr":0.015,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"ladder-keeper","strategy":"drawdown_ladder","family":"reversion","thesis":"accumulate deeper-into-the-dip in a secular uptrend, scale out on recovery","sharpe":0.893,"maxdd":-0.0934,"corr":0.574,"blend":1.582,"delta":-0.009,"wf_pos":5,"wf_n":5,"dsr":0.7596,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"coil-scout","strategy":"coil_release","family":"volatility","thesis":"compressed ranges store energy that releases upward - trade the transition","sharpe":1.14,"maxdd":-0.1632,"corr":0.761,"blend":1.57,"delta":-0.0205,"wf_pos":5,"wf_n":5,"dsr":0.9283,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"nightfade","strategy":"gap_fade_revert","family":"reversion","thesis":"panic gap-down opens in an uptrend overshoot and snap back","sharpe":0.432,"maxdd":-0.0683,"corr":0.395,"blend":1.568,"delta":-0.0229,"wf_pos":3,"wf_n":5,"dsr":0.227,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"two-clocks","strategy":"dual_horizon_agree","family":"structure","thesis":"act only when a slow uptrend and a fast turn-up agree","sharpe":0.668,"maxdd":-0.0877,"corr":0.489,"blend":1.561,"delta":-0.03,"wf_pos":5,"wf_n":5,"dsr":0.492,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"pathwise","strategy":"trend_persistence","family":"trend","thesis":"the smoothness of a climb, not its slope, predicts continuation","sharpe":0.673,"maxdd":-0.0636,"corr":0.601,"blend":1.557,"delta":-0.0334,"wf_pos":5,"wf_n":5,"dsr":0.4984,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"streakwatch","strategy":"streak_reversal","family":"reversion","thesis":"rare consecutive down-streaks in an uptrend are short-term overreactions","sharpe":0.326,"maxdd":-0.0673,"corr":0.432,"blend":1.555,"delta":-0.0354,"wf_pos":4,"wf_n":5,"dsr":0.1331,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"straightline","strategy":"slope_quality","family":"trend","thesis":"grade exposure by the R-squared of the up-trend - buy clean, refuse ragged","sharpe":0.635,"maxdd":-0.0671,"corr":0.681,"blend":1.548,"delta":-0.043,"wf_pos":5,"wf_n":5,"dsr":0.451,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"inflection","strategy":"velocity_flip","family":"trend","thesis":"price acceleration turns before the trend cross - buy the inflection","sharpe":0.963,"maxdd":-0.0974,"corr":0.75,"blend":1.542,"delta":-0.0487,"wf_pos":5,"wf_n":5,"dsr":0.8189,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"},{"agent":"ignition","strategy":"expansion_breakout","family":"volatility","thesis":"a true-range blow-out closing strong ignites a multi-day move","sharpe":0.101,"maxdd":-0.1355,"corr":0.466,"blend":1.522,"delta":-0.0682,"wf_pos":2,"wf_n":5,"dsr":0.0337,"verdict":"REJECT","reason":"the ensemble already owns this mechanism"}];
 
+/* offline fallback for the RAG-Vault sentiment panel (used file:// or vault down) */
+const DEMO_SIGNALS={ok:true,as_of:"2026-06-22",universe:50,demo:true,
+  longs:[{ticker:"NVDA",conviction:0.60,strength:0.54,confidence:"high"},
+         {ticker:"AVGO",conviction:0.49,strength:0.45,confidence:"medium"},
+         {ticker:"AMD",conviction:0.41,strength:0.39,confidence:"medium"}],
+  shorts:[{ticker:"MSFT",conviction:-0.55,strength:0.50,confidence:"high"},
+          {ticker:"IBM",conviction:-0.43,strength:0.40,confidence:"medium"},
+          {ticker:"HPQ",conviction:-0.38,strength:0.36,confidence:"medium"}]};
+
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -71,7 +80,7 @@ function activateView(v){
   $$(".nav-item").forEach(n=>n.classList.toggle("is-active",n.dataset.view===v));
   $$(".view").forEach(x=>x.classList.remove("is-active"));
   $("#view-"+v).classList.add("is-active");
-  if(v==="dashboard"){drawEquity();countUp();pollAccount();loadBook();}
+  if(v==="dashboard"){drawEquity();countUp();pollAccount();loadBook();loadSignals();}
   if(v==="agents"){startField();loadCandidates();} else if(fieldStop){fieldStop();fieldStop=null;}
   if(location.hash.slice(1)!==v)history.replaceState(null,"","#"+v);
 }
@@ -156,6 +165,36 @@ function renderEdge(){
     <div class="erow"><span>drawdown vs buy-hold</span><span class="up">−29% vs −54%</span></div>
     <div class="verdict">A <b>structural</b> risk premium arbitrage can't erase — net of MOC/MOO cost it's
       market-Sharpe with <b>half the drawdown</b>. Real, validated, not alpha: an overnight-beta sleeve.</div>`;
+}
+/* ---- RAG-Vault sentiment signals (live LONG/SHORT verdicts) ---- */
+function sigCol(title,rows,dir){
+  const cls=dir==="long"?"up":"down",arrow=dir==="long"?"▲":"▼";
+  const body=rows.length?rows.map(r=>`
+    <div class="sig-row">
+      <b class="sig-tk">${esc2(r.ticker)}</b>
+      <span class="sig-conf ${esc2(r.confidence)}">${esc2(r.confidence)}</span>
+      <div class="sig-meter"><i class="${cls}" style="width:${Math.round(Math.min(1,r.strength)*100)}%"></i></div>
+      <b class="sig-cv ${cls}">${r.conviction>=0?'+':''}${r.conviction.toFixed(2)}σ</b>
+    </div>`).join(""):`<div class="sig-empty">none today</div>`;
+  return `<div class="sig-col"><div class="sig-col-h ${cls}">${arrow} ${title}<span>${rows.length}</span></div>${body}</div>`;
+}
+function renderSignals(d){
+  const tag=$("#sigTag"),grid=$("#sigGrid"),foot=$("#sigFoot");if(!grid)return;
+  if(!d||!d.ok){
+    tag.textContent="vault offline";tag.className="tag amber";
+    grid.innerHTML=`<div class="sig-off">RAG Vault not reachable at <code>${esc2((d&&d.url)||'127.0.0.1:8000')}</code>.
+      Start it — <code>uvicorn sp500_vault.api:app --port 8000</code> — to stream live verdicts.</div>`;
+    foot.innerHTML="";return;}
+  tag.textContent=(d.demo?"demo · ":"")+`as_of ${d.as_of||'—'} · ${d.universe} names`;
+  tag.className="tag "+(d.demo?"":"up");
+  grid.innerHTML=sigCol("LONG",d.longs||[],"long")+sigCol("SHORT",d.shorts||[],"short");
+  foot.innerHTML=`IC-weighted blend — Claude sentiment + supplier lead-lag + 8-K event drift.
+    Tilt the live book with <code>--sentiment-overlay</code> (opt-in · fail-safe). SHORT trims a held name toward flat; we never open new shorts.`;
+}
+function loadSignals(){
+  if(!BACKEND){renderSignals(DEMO_SIGNALS);return;}
+  fetch("/api/signals").then(r=>r.json()).then(d=>renderSignals(d&&d.ok?d:(d||{ok:false})))
+    .catch(()=>renderSignals(DEMO_SIGNALS));
 }
 /* ---- live book feed (real Alpaca data via backend) ---- */
 const money=n=>"$"+Math.round(n).toLocaleString();

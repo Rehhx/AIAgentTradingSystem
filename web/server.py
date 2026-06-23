@@ -124,6 +124,47 @@ def _account_snapshot():
     return out
 
 
+# read-only RAG-Vault sentiment snapshot (cached 30s; fail-safe if vault offline)
+_SIG = {"t": 0.0, "data": None}
+_SIG_LOCK = threading.Lock()
+
+
+def _signals_snapshot():
+    """Live LONG/SHORT verdicts from the RAG Vault, ranked by conviction. FAIL-SAFE:
+    if the vault is unreachable this returns ok=False (the page shows an offline
+    state) -- the cockpit never breaks because the external service is down."""
+    now = time.time()
+    with _SIG_LOCK:
+        if _SIG["data"] and now - _SIG["t"] < 30:
+            return _SIG["data"]
+    url = os.getenv("SIGNAL_API_URL", "http://127.0.0.1:8000")
+    out = {"ok": False, "url": url, "as_of": None, "universe": 0,
+           "longs": [], "shorts": [], "ts": time.strftime("%H:%M:%S")}
+
+    def _row(v):
+        return {"ticker": v.get("ticker"), "direction": v.get("direction"),
+                "conviction": round(float(v.get("conviction", 0.0)), 2),
+                "strength": round(float(v.get("strength", 0.0)), 2),
+                "confidence": v.get("confidence", "none"), "breadth": v.get("breadth", 0)}
+    try:
+        from agents.rag_vault import RagVaultSignals
+        verdicts = RagVaultSignals().signals()                  # whole ranked universe
+        covered = [v for v in verdicts if v.get("coverage")]
+        longs = sorted((_row(v) for v in covered if v.get("direction") == "long"),
+                       key=lambda r: -r["conviction"])
+        shorts = sorted((_row(v) for v in covered if v.get("direction") == "short"),
+                        key=lambda r: r["conviction"])
+        out.update({"ok": True, "universe": len(covered),
+                    "as_of": covered[0].get("as_of") if covered else None,
+                    "longs": longs[:8], "shorts": shorts[:8]})
+    except Exception as e:
+        out["error"] = f"{type(e).__name__}: {e}"
+    with _SIG_LOCK:
+        _SIG["t"] = now
+        _SIG["data"] = out
+    return out
+
+
 def _classify(t: str) -> str:
     s = t.lower()
     if any(k in s for k in ("error", "traceback", "exception", "failed")):
@@ -268,6 +309,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps({"ok": True}))
         if u.path == "/api/account":
             return self._send(200, json.dumps(_account_snapshot()))
+        if u.path == "/api/signals":
+            return self._send(200, json.dumps(_signals_snapshot()))
         if u.path == "/api/candidates":
             data = (json.loads(CANDIDATES.read_text(encoding="utf-8"))
                     if CANDIDATES.is_file() else {"candidates": []})
