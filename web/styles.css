@@ -136,6 +136,20 @@ canvas{display:block}
 .lc-hold.up{color:var(--up);border-color:rgba(47,230,166,.28)}
 .lc-hold.down{color:var(--down);border-color:rgba(255,93,115,.28)}
 .lc-hold .vp{font-style:normal;font-size:8px}
+/* sentiment gate preview (which held names the overlay trades vs drops) */
+.sent-actions{margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
+.sent-actions:empty{display:none}
+.sa-head{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);margin-bottom:10px}
+.sa-head span{text-transform:none;letter-spacing:0;color:var(--faint);margin-left:6px}
+.sa-head code{color:var(--cyan)}
+.sa-row{display:flex;align-items:flex-start;gap:12px;margin-bottom:8px}
+.sa-row>b{min-width:172px;font-size:10px;letter-spacing:.03em;padding-top:3px;font-family:var(--mono)}
+.sa-chips{display:flex;flex-wrap:wrap;gap:5px;flex:1}
+.sa-chip{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg)}
+.sa-chip.up{color:var(--up);border-color:rgba(47,230,166,.3)}
+.sa-chip.down{color:var(--down);border-color:rgba(255,93,115,.3);text-decoration:line-through;opacity:.85}
+.sa-none{color:var(--dim2);font-size:10px;font-family:var(--mono)}
+.sa-foot{font-size:10px;color:var(--dim2);line-height:1.5;margin-top:6px;border-left:2px solid var(--up);padding-left:10px}
 
 /* equity chart */
 .chart-wrap{position:relative;height:240px}

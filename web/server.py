@@ -98,6 +98,7 @@ def _account_snapshot():
         return out
     sig = _signals_snapshot()                       # cached; for per-holding verdicts
     bt = sig.get("by_ticker", {}) if sig.get("ok") else {}
+    held_syms = set()                               # every held name (for the gate preview)
 
     def _pos(p):
         sym = p.symbol.replace(".", "-")
@@ -119,6 +120,7 @@ def _account_snapshot():
             a = c.get_account()
             eq, last = float(a.equity), float(a.last_equity)
             pos = c.get_all_positions()
+            held_syms.update(p.symbol.replace(".", "-").upper() for p in pos)
             top = sorted(pos, key=lambda p: -abs(float(p.market_value)))[:5]
             row.update({"equity": eq, "last_equity": last, "cash": float(a.cash),
                         "today": (eq / last - 1) if last else 0.0, "pl": eq - last,
@@ -127,6 +129,18 @@ def _account_snapshot():
             row["status"] = "error"
             row["err"] = str(e)[:80]
         out["accounts"].append(row)
+
+    # gate preview: which HELD names --sentiment-overlay would trade (long) vs
+    # drop (short). Mirrors agents.rag_vault.apply_sentiment_overlay(mode="gate").
+    sent = {"mode": "gate", "ok": bool(bt), "as_of": sig.get("as_of"), "long": [], "short": []}
+    for s in sorted(held_syms):
+        v = bt.get(s)
+        if v and v.get("direction") in ("long", "short"):
+            sent[v["direction"]].append({"sym": s, "conv": v["conviction"], "conf": v["confidence"]})
+    sent["long"].sort(key=lambda r: -r["conv"])
+    sent["short"].sort(key=lambda r: r["conv"])
+    out["sentiment"] = sent
+
     with _ACCT_LOCK:
         _ACCT["t"] = now
         _ACCT["data"] = out

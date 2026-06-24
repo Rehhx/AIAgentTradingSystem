@@ -74,27 +74,35 @@ class RagVaultSignals:
         return self._get("/signals", params)["signals"]
 
 
-def apply_sentiment_overlay(weights: dict, *, tilt: float = 0.25,
+def apply_sentiment_overlay(weights: dict, *, mode: str = "tilt", tilt: float = 0.25,
                             client: "RagVaultSignals | None" = None,
                             horizon: int | None = None,
                             min_confidence: str = "medium",
                             exclude: tuple[str, ...] = ("BIL", "SHV", "SGOV"),
                             verbose: bool = True) -> dict:
-    """Tilt live book weights by the RAG Vault verdicts. Returns a NEW weights dict.
+    """Overlay the RAG Vault verdicts onto live book weights. Returns a NEW dict.
 
-    For each currently-held name (weight > 0) the vault verdict scales its weight:
-      LONG  -> w * (1 + tilt * strength)   (boost, capped at 1 + tilt)
-      SHORT -> w * (1 - tilt * strength)   (trim toward flat -- a veto, no new short)
-      FLAT / no coverage / below `min_confidence` -> unchanged
+    The book is long/flat, so a SHORT verdict is always a veto -- never a new short.
 
-    `tilt` is the max fractional move per name (0.25 = +/-25%). Cash-park tickers
-    (BIL etc.) are skipped. FAIL-SAFE: any error reaching the vault logs a warning
-    and returns the input weights unchanged -- the live path never breaks on an
-    offline service.
+    mode="gate" (decisive -- "trade what the vault confirms"):
+      LONG  -> keep the name and CONCENTRATE into it
+      SHORT -> drop the name to flat (don't trade it now)
+      FLAT / not covered -> leave the algorithm's weight untouched
+      Capital freed by the SHORT drops is reallocated to the LONG-confirmed names
+      pro-rata by their existing weight, so total invested is preserved. Downstream
+      name-cap / vol-target / cash-park still bound the result.
+
+    mode="tilt" (gentle -- bounded nudge):
+      LONG  -> w * (1 + tilt * strength)
+      SHORT -> w * (1 - tilt * strength)   (trim toward flat)
+      FLAT / not covered / below `min_confidence` -> unchanged
+
+    Cash-park tickers (BIL etc.) are skipped. FAIL-SAFE: any error reaching the
+    vault logs a warning and returns the input weights unchanged.
     """
     held = [t for t, w in weights.items()
             if w > 1e-9 and t.upper() not in {e.upper() for e in exclude}]
-    if not held or tilt <= 0:
+    if not held or (mode == "tilt" and tilt <= 0):
         return dict(weights)
 
     client = client or RagVaultSignals()
@@ -107,32 +115,61 @@ def apply_sentiment_overlay(weights: dict, *, tilt: float = 0.25,
         return dict(weights)
 
     by_ticker = {v.get("ticker", "").upper(): v for v in verdicts}
-    out = dict(weights)
     floor = max(0.0, _CONF_RANK.get(min_confidence, 2))
-    boosted, trimmed, as_of = [], [], None
-    for t in held:
+    as_of = next((by_ticker[t.upper()].get("as_of") for t in held
+                  if by_ticker.get(t.upper(), {}).get("as_of")), None)
+    tag = f" (vault as_of {as_of})" if as_of else ""
+
+    def _verdict(t):
+        """(direction, strength) if the vault has an actionable read on t, else (None, 0)."""
         v = by_ticker.get(t.upper())
         if not v or not v.get("coverage"):
-            continue
-        as_of = as_of or v.get("as_of")
+            return None, 0.0
         direction = v.get("direction", "flat")
-        if direction == "flat":
-            continue
-        if _CONF_RANK.get(v.get("confidence", "none"), 0) < floor:
-            continue
-        strength = float(v.get("strength", 0.0))
+        if direction == "flat" or _CONF_RANK.get(v.get("confidence", "none"), 0) < floor:
+            return None, 0.0
+        return direction, float(v.get("strength", 0.0))
+
+    out = dict(weights)
+
+    if mode == "gate":
+        longs, dropped, freed = [], [], 0.0
+        for t in held:
+            direction, _ = _verdict(t)
+            if direction == "short":
+                freed += weights[t]
+                out[t] = 0.0
+                dropped.append(t)
+            elif direction == "long":
+                longs.append(t)
+            # flat / not covered -> leave the algorithm's weight as-is
+        if longs and freed > 1e-9:
+            base = sum(weights[t] for t in longs)
+            for t in longs:
+                share = (weights[t] / base) if base > 0 else 1.0 / len(longs)
+                out[t] = weights[t] + freed * share
+        if verbose:
+            if longs or dropped:
+                print(f"  [sentiment] gate: trade {len(longs)} long-confirmed "
+                      f"({', '.join(sorted(longs)) or '-'}), drop {len(dropped)} short "
+                      f"({', '.join(sorted(dropped)) or '-'}); reallocated {freed:.1%} "
+                      f"of the book into longs{tag}")
+            else:
+                print(f"  [sentiment] gate: no long/short verdicts for {len(held)} held "
+                      f"name(s) -- algorithm unchanged{tag}")
+        return out
+
+    # mode == "tilt"
+    boosted, trimmed = [], []
+    for t in held:
+        direction, strength = _verdict(t)
         if direction == "long":
-            mult = 1.0 + tilt * strength
+            out[t] = weights[t] * (1.0 + tilt * strength)
             boosted.append(t)
         elif direction == "short":
-            mult = max(0.0, 1.0 - tilt * strength)
+            out[t] = weights[t] * max(0.0, 1.0 - tilt * strength)
             trimmed.append(t)
-        else:
-            continue
-        out[t] = weights[t] * mult
-
     if verbose:
-        tag = f" (vault as_of {as_of})" if as_of else ""
         if boosted or trimmed:
             print(f"  [sentiment] tilt +/-{tilt:.0%}: boosted {len(boosted)} "
                   f"({', '.join(sorted(boosted)) or '-'}), trimmed {len(trimmed)} "

@@ -12,7 +12,7 @@ const DATA = {
     {k:"CAGR",          v:10.5,  d:"equity ensemble",    vc:"var(--text)",suf:"%",dec:1},
     {k:"Max Drawdown",  v:-7.8,  d:"vs SPY −33.7%",      vc:"var(--up)",  suf:"%",dec:1},
     {k:"Walk-forward",  v:5,     d:"of 5 folds positive",vc:"var(--text)",suf:"/5"},
-    {k:"Unit tests",    v:71,    d:"rigor · engine · CV",vc:"var(--cyan)",suf:" ✓"},
+    {k:"Unit tests",    v:76,    d:"rigor · engine · CV",vc:"var(--cyan)",suf:" ✓"},
   ],
   rigor: [
     {l:"Deflated Sharpe (best sleeve)", v:"99.4%", w:"99%", good:1, n:"corrected for 13 trials"},
@@ -189,7 +189,7 @@ function renderSignals(d){
   tag.className="tag "+(d.demo?"":"up");
   grid.innerHTML=sigCol("LONG",d.longs||[],"long")+sigCol("SHORT",d.shorts||[],"short");
   foot.innerHTML=`IC-weighted blend — Claude sentiment + supplier lead-lag + 8-K event drift.
-    Tilt the live book with <code>--sentiment-overlay</code> (opt-in · fail-safe). SHORT trims a held name toward flat; we never open new shorts.`;
+    Drive the live book with <code>--sentiment-overlay</code> (gate · opt-in · fail-safe): trade the longs, drop the shorts, concentrate into the matches; flat / uncovered names are left to the algorithm.`;
 }
 function loadSignals(){
   if(!BACKEND){renderSignals(DEMO_SIGNALS);return;}
@@ -229,6 +229,20 @@ function renderLive(d){
     <div class="lc-eq">${any?money(tot):'—'}</div>
     <div class="lc-row"><span class="${tUp?'up':'down'}">${tUp?'▲':'▼'} ${money(Math.abs(totPl))} today</span></div></div>`;
   $("#liveGrid").innerHTML=totalCard+cards;
+  renderSentActions(d.sentiment);
+}
+/* gate preview: which held names --sentiment-overlay would TRADE (long) vs DROP (short) */
+function renderSentActions(s){
+  const el=$("#sentActions");if(!el)return;
+  if(!s||!s.ok||(!s.long.length&&!s.short.length)){el.innerHTML="";return;}
+  const chips=(arr,cls,arrow)=>arr.length?arr.map(r=>
+    `<span class="sa-chip ${cls}" title="${esc2(r.sym)} · vault ${r.conv>=0?'+':''}${r.conv}σ (${esc2(r.conf)})">${arrow} ${esc2(r.sym)}</span>`
+    ).join(""):`<span class="sa-none">none today</span>`;
+  el.innerHTML=`<div class="sa-head">sentiment overlay · <b class="up">gate</b>
+      <span>what <code>--sentiment-overlay</code> trades · as_of ${s.as_of||'—'}</span></div>
+    <div class="sa-row"><b class="up">▲ TRADE · go long (${s.long.length})</b><div class="sa-chips">${chips(s.long,'up','▲')}</div></div>
+    <div class="sa-row"><b class="down">✕ DROP · don't trade (${s.short.length})</b><div class="sa-chips">${chips(s.short,'down','✕')}</div></div>
+    <div class="sa-foot">Capital freed by the drops is concentrated into the long-confirmed names; flat / uncovered names are left to the algorithm.</div>`;
 }
 function pollAccount(){
   if(!BACKEND)return;

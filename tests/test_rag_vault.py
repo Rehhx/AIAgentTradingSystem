@@ -85,3 +85,48 @@ def test_empty_or_zero_tilt_is_noop():
     w = {"NVDA": 0.10}
     client = _StubClient({"NVDA": _v("NVDA", "long", strength=1.0)})
     assert apply_sentiment_overlay(w, tilt=0.0, client=client, verbose=False) == w
+
+
+# --- gate mode: trade longs / drop shorts / concentrate into matches ----------
+
+def test_gate_drops_short_and_reallocates_to_long():
+    w = {"NVDA": 0.10, "HPQ": 0.10}
+    client = _StubClient({"NVDA": _v("NVDA", "long"), "HPQ": _v("HPQ", "short")})
+    out = apply_sentiment_overlay(w, mode="gate", client=client, verbose=False)
+    assert out["HPQ"] == 0.0                                # short -> dropped
+    assert out["NVDA"] == pytest.approx(0.20)              # gets the freed 0.10
+    assert sum(out.values()) == pytest.approx(sum(w.values()))   # invested preserved
+
+
+def test_gate_reallocates_proportional_to_weight():
+    w = {"AAA": 0.20, "BBB": 0.10, "SHT": 0.30}
+    client = _StubClient({"AAA": _v("AAA", "long"), "BBB": _v("BBB", "long"),
+                          "SHT": _v("SHT", "short")})
+    out = apply_sentiment_overlay(w, mode="gate", client=client, verbose=False)
+    assert out["SHT"] == 0.0
+    assert out["AAA"] == pytest.approx(0.20 + 0.30 * (0.20 / 0.30))   # 0.40
+    assert out["BBB"] == pytest.approx(0.10 + 0.30 * (0.10 / 0.30))   # 0.20
+
+
+def test_gate_flat_and_uncovered_left_to_algorithm():
+    w = {"AAA": 0.10, "BBB": 0.10}
+    client = _StubClient({"AAA": _v("AAA", "flat"),
+                          "BBB": _v("BBB", "long", coverage=False)})
+    out = apply_sentiment_overlay(w, mode="gate", client=client, verbose=False)
+    assert out == w                                         # nothing dropped, nothing freed
+
+
+def test_gate_short_with_no_long_target_frees_to_cash():
+    w = {"HPQ": 0.10, "CCC": 0.10}
+    client = _StubClient({"HPQ": _v("HPQ", "short"), "CCC": _v("CCC", "flat")})
+    out = apply_sentiment_overlay(w, mode="gate", client=client, verbose=False)
+    assert out["HPQ"] == 0.0                                # dropped, freed stays out
+    assert out["CCC"] == pytest.approx(0.10)               # flat untouched
+    assert sum(out.values()) == pytest.approx(0.10)        # 10% now idle -> cash-parked downstream
+
+
+def test_gate_offline_vault_returns_book_unchanged():
+    w = {"NVDA": 0.10, "HPQ": 0.20}
+    client = _StubClient(raises=ConnectionError("refused"))
+    out = apply_sentiment_overlay(w, mode="gate", client=client, verbose=False)
+    assert out == w
